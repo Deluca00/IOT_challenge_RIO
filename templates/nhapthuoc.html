@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Thông Tin Thuốc</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #e0f2fe, #bfdbfe);
+            font-family: 'Inter', sans-serif;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .card {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+        }
+        .input-field {
+            transition: all 0.3s ease;
+        }
+        .input-field:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .btn {
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        th {
+            background: #f3f4f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="inputSection" class="card">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">Nhập Thông Tin Thuốc</h1>
+                <a class="btn bg-gray-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-gray-700">Quay về Trang chủ</a>
+            </div>
+            <form id="medicineForm" class="space-y-4">
+                <div>
+                    <label for="medicineName" class="block text-sm font-medium text-gray-700">Tên Thuốc</label>
+                    <input type="text" id="medicineName" name="medicineName" required
+                        class="input-field mt-1 block w-full rounded-md border-gray-300 border p-2 focus:outline-none focus:ring focus:ring-blue-200">
+                </div>
+                <div>
+                    <label for="medicineType" class="block text-sm font-medium text-gray-700">Loại Thuốc</label>
+                    <select id="medicineType" name="medicineType" required
+                        class="input-field mt-1 block w-full rounded-md border-gray-300 border p-2 focus:outline-none focus:ring focus:ring-blue-200">
+                        <option value="">Chọn loại thuốc</option>
+                        <option value="Viên nén">Viên nén</option>
+                        <option value="Viên nang">Viên nang</option>
+                        <option value="Dung dịch">Dung dịch</option>
+                        <option value="Thuốc tiêm">Thuốc tiêm</option>
+                        <option value="Khác">Khác</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="medicineCode" class="block text-sm font-medium text-gray-700">Mã Code</label>
+                    <input type="text" id="medicineCode" name="medicineCode" required
+                                value="{{ barcode }}"
+                                {% if barcode %} readonly {% endif %}
+                        class="input-field mt-1 block w-full rounded-md border-gray-300 border p-2 focus:outline-none focus:ring focus:ring-blue-200">
+                </div>
+                <div>
+                    <label for="manufacturingDate" class="block text-sm font-medium text-gray-700">Ngày Sản Xuất</label>
+                    <input type="date" id="manufacturingDate" name="manufacturingDate" required
+                        class="input-field mt-1 block w-full rounded-md border-gray-300 border p-2 focus:outline-none focus:ring focus:ring-blue-200">
+                </div>
+                <div>
+                    <label for="expirationDate" class="block text-sm font-medium text-gray-700">Hạn Sử Dụng</label>
+                    <input type="date" id="expirationDate" name="expirationDate" required
+                        class="input-field mt-1 block w-full rounded-md border-gray-300 border p-2 focus:outline-none focus:ring focus:ring-blue-200">
+                </div>
+                <button type="submit"
+                    class="btn w-full bg-blue-600 text-white font-semibold py-2 rounded-md hover:bg-blue-700">Lưu Thông Tin</button>
+            </form>
+            <div id="result" class="mt-4 text-center text-gray-600"></div>
+            <button id="viewListButton" class="btn mt-4 w-full bg-gray-600 text-white font-semibold py-2 rounded-md hover:bg-gray-700">Xem Danh Sách Thuốc</button>
+        </div>
+
+        <div id="listSection" class="card hidden mt-4">
+            <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">Danh Sách Thuốc</h1>
+            <table id="medicineTable">
+                <thead>
+                    <tr>
+                        <th>Tên Thuốc</th>
+                        <th>Loại Thuốc</th>
+                        <th>Mã Code</th>
+                        <th>Ngày Sản Xuất</th>
+                        <th>Hạn Sử Dụng</th>
+                        <th>Hành Động</th>
+                    </tr>
+                </thead>
+                <tbody id="medicineList"></tbody>
+            </table>
+            <button id="backButton" class="btn mt-4 w-full bg-gray-600 text-white font-semibold py-2 rounded-md hover:bg-gray-700">Quay Về</button>
+        </div>
+    </div>
+
+<script>
+    document.getElementById('medicineForm').addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        const medicine = {
+            name: document.getElementById('medicineName').value,
+            type: document.getElementById('medicineType').value,
+            code: document.getElementById('medicineCode').value,
+            manuDate: document.getElementById('manufacturingDate').value,
+            expDate: document.getElementById('expirationDate').value
+        };
+
+        const response = await fetch('/save_medicine', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(medicine)
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            document.getElementById('result').innerHTML = '<span class="text-green-600">Lưu thuốc thành công!</span>';
+            this.reset();
+        } else {
+            document.getElementById('result').innerHTML = '<span class="text-red-600">Lỗi: ' + result.error + '</span>';
+        }
+    });
+
+    document.getElementById('viewListButton').addEventListener('click', async () => {
+        const response = await fetch('/list_medicine');
+        const medicines = await response.json();
+
+        const tbody = document.getElementById('medicineList');
+        tbody.innerHTML = '';
+
+        Object.entries(medicines).forEach(([id, med]) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${med.name}</td>
+                <td>${med.type}</td>
+                <td>${med.code}</td>
+                <td>${med.manuDate}</td>
+                <td>${med.expDate}</td>
+                <td>
+                    <button onclick="deleteMedicine('${id}')" class="btn bg-red-500 text-white px-2 py-1 rounded-md hover:bg-red-600">Xóa</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        document.getElementById('inputSection').classList.add('hidden');
+        document.getElementById('listSection').classList.remove('hidden');
+    });
+
+    async function deleteMedicine(id) {
+        if (!confirm('Bạn có chắc chắn muốn xóa thuốc này?')) return;
+
+        const response = await fetch('/delete_medicine/' + id, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.success) {
+            alert("Xóa thành công!");
+            document.getElementById('viewListButton').click(); // reload list
+        } else {
+            alert("Xóa thất bại: " + result.error);
+        }
+    }
+
+    document.getElementById('backButton').addEventListener('click', () => {
+        document.getElementById('inputSection').classList.remove('hidden');
+        document.getElementById('listSection').classList.add('hidden');
+
+    });
+</script>
+
+</body>
+</html>

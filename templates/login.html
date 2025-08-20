@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đăng nhập & Đăng ký</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+    }
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+    .fade-slide {
+      animation: fadeSlide 0.5s ease-in-out;
+    }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .card {
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+    .input-icon:focus-within i {
+      color: #2563eb;
+    }
+  </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+  <div class="container mx-auto p-6">
+    <div id="authCard" class="bg-white rounded-2xl card max-w-md mx-auto fade-slide">
+      <!-- Header -->
+      <div class="text-center py-6">
+        <i class="fas fa-heartbeat text-blue-600 text-4xl pulse"></i>
+      </div>
+
+      <!-- Login Form -->
+      <div id="loginForm" class="p-6">
+        <h2 class="text-xl font-semibold text-center text-blue-600 mb-4">Đăng nhập</h2>
+        <form method="POST" action="/login" class="space-y-4">
+          <div>
+            <label for="loginEmail" class="block text-sm font-medium text-gray-700">Email</label>
+            <div class="mt-1 relative">
+              <input id="loginEmail" name="email" type="email" required
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                placeholder="Nhập email">
+              <i class="fas fa-envelope absolute right-3 top-3 text-gray-400"></i>
+            </div>
+          </div>
+          <div>
+            <label for="loginPassword" class="block text-sm font-medium text-gray-700">Mật khẩu</label>
+            <div class="mt-1 relative">
+              <input id="loginPassword" name="password" type="password" required
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                placeholder="Nhập mật khẩu">
+              <i class="fas fa-lock absolute right-3 top-3 text-gray-400"></i>
+            </div>
+          </div>
+          <button type="submit"
+            class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition-colors">
+            Đăng nhập
+          </button>
+        </form>
+        <p class="mt-4 text-center text-sm text-gray-600">
+          Chưa có tài khoản?
+          <a href="#" onclick="toggleForm()" class="text-blue-600 hover:underline">Đăng ký</a>
+        </p>
+      </div>
+
+      <!-- Register Form -->
+      <div id="registerForm" class="p-6 hidden">
+        <h2 class="text-xl font-semibold text-center text-blue-600 mb-4">Đăng ký</h2>
+        <form method="POST" action="/register" class="space-y-4">
+          <div>
+            <label for="registerName" class="block text-sm font-medium text-gray-700">Họ và tên</label>
+            <div class="mt-1 relative">
+              <input id="registerName" name="name" type="text" required
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                placeholder="Nhập họ và tên">
+              <i class="fas fa-user absolute right-3 top-3 text-gray-400"></i>
+            </div>
+          </div>
+          <div>
+            <label for="registerEmail" class="block text-sm font-medium text-gray-700">Email</label>
+            <div class="mt-1 relative">
+              <input id="registerEmail" name="email" type="email" required
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                placeholder="Nhập email">
+              <i class="fas fa-envelope absolute right-3 top-3 text-gray-400"></i>
+            </div>
+          </div>
+          <div>
+            <label for="registerPassword" class="block text-sm font-medium text-gray-700">Mật khẩu</label>
+            <div class="mt-1 relative">
+              <input id="registerPassword" name="password" type="password" required
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                placeholder="Nhập mật khẩu">
+              <i class="fas fa-lock absolute right-3 top-3 text-gray-400"></i>
+            </div>
+          </div>
+          <button type="submit"
+            class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition-colors">
+            Đăng ký
+          </button>
+        </form>
+        <p class="mt-4 text-center text-sm text-gray-600">
+          Đã có tài khoản?
+          <a href="#" onclick="toggleForm()" class="text-blue-600 hover:underline">Đăng nhập</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleForm() {
+      const loginForm = document.getElementById('loginForm');
+      const registerForm = document.getElementById('registerForm');
+      const authCard = document.getElementById('authCard');
+
+      authCard.classList.remove('fade-slide');
+      void authCard.offsetWidth;
+      authCard.classList.add('fade-slide');
+
+      loginForm.classList.toggle('hidden');
+      registerForm.classList.toggle('hidden');
+    }
+  </script>
+</body>
+</html>
