@@ -2,20 +2,16 @@ from flask import Flask, Response, render_template,request, redirect, url_for, s
 import cv2
 import threading
 import time
-import firebase_admin
-from firebase_admin import credentials, db
 import numpy as np
 import base64
 from pyzbar.pyzbar import decode
+from database import get_connection, init_db
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey" 
 app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024  # 30 MB
 
-cred = credentials.Certificate("aiforlife-12891-firebase-adminsdk-9g1al-4b9118fe29.json")
-firebase_admin.initialize_app(cred, {
-    "databaseURL": "https://flaskapphn-default-rtdb.firebaseio.com/"  # thay URL của bạn
-})
+init_db()
 ###############################################################################
 # CẤU HÌNH NGUỒN CAMERA
 # - Có thể là chỉ số webcam (0,1,2,3) hoặc URL RTSP/HTTP.
@@ -212,37 +208,47 @@ def nhapthuoc():
 
 @app.route("/save_medicine", methods=["POST"])
 def save_medicine():
-    if "uid" not in session:
-        return {"success": False, "error": "Chưa đăng nhập"}, 403
+    data = request.get_json()
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO medicines (name, type, code, manu_date, exp_date)
+        VALUES (?, ?, ?, ?, ?)
+    """, (
+        data.get("name"),
+        data.get("type"),
+        data.get("code"),
+        data.get("manuDate"),
+        data.get("expDate"),
+    ))
+    conn.commit()
+    new_id = c.lastrowid
+    conn.close()
+    return {"success": True, "id": new_id}
 
-    try:
-        data = request.get_json()
-        ref = db.reference("medicines")
-        new_ref = ref.push(data)  # push vào Firebase
-        return {"success": True, "id": new_ref.key}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
 
 @app.route("/list_medicine", methods=["GET"])
 def list_medicine():
-    if "uid" not in session:
-        return {"error": "Chưa đăng nhập"}, 403
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM medicines")
+    rows = c.fetchall()
+    conn.close()
+    medicines = [dict(row) for row in rows]
+    return {"success": True, "data": medicines}
 
-    try:
-        ref = db.reference("medicines")
-        medicines = ref.get()
-        return medicines if medicines else {}
-    except Exception as e:
-        return {"error": str(e)}
 
-@app.route("/delete_medicine/<string:med_id>", methods=["DELETE"])
+@app.route("/delete_medicine/<int:med_id>", methods=["DELETE"])
 def delete_medicine(med_id):
     if "uid" not in session:
         return {"success": False, "error": "Chưa đăng nhập"}, 403
 
     try:
-        ref = db.reference(f"medicines/{med_id}")
-        ref.delete()
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("DELETE FROM medicines WHERE id=?", (med_id,))
+        conn.commit()
+        conn.close()
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}

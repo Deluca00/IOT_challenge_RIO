@@ -145,25 +145,29 @@
 
     document.getElementById('viewListButton').addEventListener('click', async () => {
         const response = await fetch('/list_medicine');
-        const medicines = await response.json();
+        const result = await response.json();
+        const medicines = result.data;
 
         const tbody = document.getElementById('medicineList');
         tbody.innerHTML = '';
 
-        Object.entries(medicines).forEach(([id, med]) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${med.name}</td>
-                <td>${med.type}</td>
-                <td>${med.code}</td>
-                <td>${med.manuDate}</td>
-                <td>${med.expDate}</td>
-                <td>
-                    <button onclick="deleteMedicine('${id}')" class="btn bg-red-500 text-white px-2 py-1 rounded-md hover:bg-red-600">Xóa</button>
-                </td>
-            `;
-            tbody.appendChild(row);
-        });
+        medicines.forEach(med => {
+          const row = document.createElement('tr');
+                 row.innerHTML = `
+                  <td>${med.name}</td>
+                  <td>${med.type}</td>
+                  <td>${med.code}</td>
+                  <td>${med.manu_date}</td>
+                  <td>${med.exp_date}</td>
+                  <td>
+                   <button onclick="deleteMedicine('${med.id}')"
+                    class="btn bg-red-500 text-white px-2 py-1 rounded-md hover:bg-red-600">
+                            Xóa
+                   </button>
+                     </td>
+               `;                
+              tbody.appendChild(row);
+});
 
         document.getElementById('inputSection').classList.add('hidden');
         document.getElementById('listSection').classList.remove('hidden');
