@@ -457,7 +457,7 @@
   <i class="fas fa-th-large"></i>
 </button>
 
-<button id="btnDatabase" class="text-[#1e88e5] text-xl sm:text-2xl">
+<button  id="btnBanthuoc" class="text-[#1e88e5] text-xl sm:text-2xl">
   <i class="fas fa-database"></i>
 </button>
 
@@ -552,7 +552,7 @@
       .addEventListener('click', openCameraGrid);
 
       const btnNhapThuoc = document.getElementById("btnNhapThuoc");
-const btnDatabase = document.getElementById("btnDatabase");
+const btnbanthuoc = document.getElementById("btnBanthuoc");
 const cameraDiv = document.getElementById("cameraDiv");
 const video = document.getElementById("video");
 const btnCapture = document.getElementById("btnCapture");
@@ -602,10 +602,10 @@ btnNhapThuoc.addEventListener("click", () => {
   startCamera();
 });
 
-// Mở database
-btnDatabase.addEventListener("click", () => {
-  window.location.href = "/database";
+btnbanthuoc.addEventListener("click", () => {
+    window.location.href = "/banthuoc";
 });
+
 
 
 btnCapture.addEventListener("click", () => {

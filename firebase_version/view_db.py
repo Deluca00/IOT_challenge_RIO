@@ -9,7 +9,8 @@ c.execute("SELECT name FROM sqlite_master WHERE type='table'")
 print("Tables:", [row[0] for row in c.fetchall()])
 
 # Xem dữ liệu trong bảng medicines
-c.execute("SELECT * FROM medicines")
+c.execute("SELECT * FROM sales")
+
 rows = c.fetchall()
 
 for row in rows:

@@ -18,11 +18,32 @@ def init_db():
     name TEXT,
     type TEXT,
     code TEXT,
+    quantity TEXT,
+    price TEXT,
+    strip TEXT,
+    pill TEXT,
+    left_strip INTEGER DEFAULT 0, -- vỉ lẻ còn lại của hộp đang bán
+    left_pill INTEGER DEFAULT 0,  -- viên lẻ còn lại của vỉ đang bán
     manu_date TEXT,
     exp_date TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 
+    """)
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS sales (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        medicine_id INTEGER,
+        customer_name TEXT,
+        hometown TEXT,
+        dob TEXT,
+        unit TEXT,              -- Hộp / Vỉ / Viên
+        quantity INTEGER,
+        total_price REAL,
+        advice TEXT,
+        purchase_date TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
     """)
     conn.commit()
     conn.close()

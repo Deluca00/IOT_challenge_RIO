@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Bán Thuốc</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #e0f2fe, #bfdbfe);
+            font-family: 'Inter', sans-serif;
+        }
+
+        #medicineEntries {
+            position: relative;
+        }
+
+        #addMedicine {
+            position: sticky;
+            bottom: 0;
+            z-index: 10;
+        }
+
+        @media (min-width: 640px) {
+            #addMedicine {
+                position: static;
+            }
+        }
+
+        .autocomplete-list {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 0.5rem;
+            max-height: 200px;
+            overflow-y: auto;
+            width: 100%;
+            z-index: 50;
+        }
+
+        .autocomplete-item {
+            padding: 8px;
+            cursor: pointer;
+        }
+
+        .autocomplete-item:hover {
+            background: #f1f5f9;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="container max-w-3xl w-full mx-auto space-y-6">
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-6">
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">Form Bán Thuốc</h1>
+                <a href="/"
+                    class="mt-4 sm:mt-0 bg-gray-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-gray-700">Quay
+                    về Trang chủ</a>
+            </div>
+
+            <form id="sellMedicineForm" class="space-y-6">
+                <!-- Thông tin khách -->
+                <div class="space-y-4">
+                    <div>
+                        <label for="username" class="block text-sm font-medium text-gray-700">Tên Người Mua</label>
+                        <input type="text" id="username" name="username" required
+                            class="mt-1 block w-full rounded-md border p-3" placeholder="Nhập tên người mua">
+                    </div>
+                    <div>
+                        <label for="hometown" class="block text-sm font-medium text-gray-700">Quê Quán</label>
+                        <input type="text" id="hometown" name="hometown" required
+                            class="mt-1 block w-full rounded-md border p-3" placeholder="Nhập quê quán">
+                    </div>
+                    <div>
+                        <label for="dateOfBirth" class="block text-sm font-medium text-gray-700">Ngày Sinh</label>
+                        <input type="date" id="dateOfBirth" name="dateOfBirth" required
+                            class="mt-1 block w-full rounded-md border p-3">
+                    </div>
+                </div>
+
+                <!-- Thông tin thuốc -->
+                <div id="medicineEntries" class="space-y-4 pb-16 sm:pb-0">
+                    <h2 class="text-lg font-semibold text-gray-700">Thông Tin Thuốc</h2>
+                    <div class="medicine-entry space-y-4 border-b pb-4 relative">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                            <div class="relative">
+                                <label for="medicineName_0" class="block text-sm font-medium text-gray-700">Tên
+                                    Thuốc</label>
+
+                                <input type="text" id="medicineName_0" name="medicineName_0" required
+                                    class="mt-1 block w-full rounded-md border p-3" placeholder="Nhập tên thuốc"
+                                    autocomplete="off">
+                                <input type="hidden" id="medicineId_0" name="medicineId_0">
+                                <div id="autocomplete_0" class="autocomplete-list hidden"></div>
+                            </div>
+                            <div>
+                                <label for="quantity_0" class="block text-sm font-medium text-gray-700">Số lượng trong
+                                    kho</label>
+                                <input type="text" id="quantity_0" name="quantity_0" readonly
+                                    class="mt-1 block w-full rounded-md border p-3 bg-gray-100">
+                            </div>
+                            <div>
+                                <label for="strip_0" class="block text-sm font-medium text-gray-700" readonly>Số Vĩ
+                                    Trong
+                                    Hộp</label>
+                                <input type="number" readonly id="strip_0" name="strip_0" min="1"
+                                    class="mt-1 block w-full rounded-md border p-3">
+                            </div>
+                            <div>
+                                <label for="pill_0" class="block text-sm font-medium text-gray-700">Số Viên
+                                    Trong 1 Vĩ</label>
+                                <input type="number" readonly id="pill_0" name="pill_0" min="1"
+                                    class="mt-1 block w-full rounded-md border p-3">
+                            </div>
+                            <div>
+                                <label for="price_0" redonly class="block text-sm font-medium text-gray-700">Giá Tiền
+                                    (VND)</label>
+                                <input type="number" id="price_0" name="price_0" min="0" step="0.01"
+                                    class="mt-1 block w-full rounded-md border p-3">
+                            </div>
+                            <div>
+                                <label for="unitSold_0" class="block text-sm font-medium text-gray-700">Đơn Vị
+                                    Bán</label>
+                                <select id="unitSold_0" name="unitSold_0"
+                                    class="mt-1 block w-full rounded-md border p-3">
+                                    <option value="Hộp">Hộp</option>
+                                    <option value="Vỉ">Vỉ</option>
+                                    <option value="Viên">Viên</option>
+                                </select>
+                            </div>
+
+                            <div id="leftStockBox_0" class="hidden">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Vỉ đang bán dở</label>
+                                    <input type="number" id="leftStrip_0" readonly
+                                        class="mt-1 block w-full rounded-md border p-3 bg-gray-100">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Viên đang bán dở</label>
+                                    <input type="number" id="leftPill_0" readonly
+                                        class="mt-1 block w-full rounded-md border p-3 bg-gray-100">
+                                </div>
+                            </div>
+
+
+
+                            <div>
+                                <label for="quantitySold_0" class="block text-sm font-medium text-gray-700">Số Lượng
+                                    Bán</label>
+                                <input type="number" id="quantitySold_0" name="quantitySold_0" min="1"
+                                    class="mt-1 block w-full rounded-md border p-3">
+                            </div>
+                            <div>
+                                <label for="totalAmount_0" class="block text-sm font-medium text-gray-700">Thành Tiền
+                                    (VND)</label>
+                                <input type="number" id="totalAmount_0" name="totalAmount_0" readonly
+                                    class="mt-1 block w-full rounded-md border p-3 bg-gray-100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" id="addMedicine"
+                    class="w-full bg-green-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-green-700">Thêm
+                    Thuốc</button>
+
+                <!-- Lời khuyên -->
+                <div class="space-y-4">
+                    <div>
+                        <label for="doctorAdvice" class="block text-sm font-medium text-gray-700">Lời Khuyên Bác
+                            Sĩ</label>
+                        <textarea id="doctorAdvice" name="doctorAdvice" required
+                            class="mt-1 block w-full rounded-md border p-3" rows="4"></textarea>
+                    </div>
+                    <div>
+                        <label for="purchaseDate" class="block text-sm font-medium text-gray-700">Ngày Mua</label>
+                        <input type="date" id="purchaseDate" name="purchaseDate" required
+                            class="mt-1 block w-full rounded-md border p-3">
+                    </div>
+                </div>
+
+                <button type="submit"
+                    class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700">Lưu Thông
+                    Tin</button>
+            </form>
+            <div id="result" class="mt-4 text-center text-gray-600"></div>
+        </div>
+    </div>
+
+    <script>
+        // === AUTOCOMPLETE ===
+        function setupAutocomplete(index) {
+            const input = document.getElementById(`medicineName_${index}`);
+            const stockInput = document.getElementById(`quantity_${index}`);
+            const stripInput = document.getElementById(`strip_${index}`);
+            const pillInput = document.getElementById(`pill_${index}`);
+            const priceInput = document.getElementById(`price_${index}`);
+            const list = document.getElementById(`autocomplete_${index}`);
+            const leftStripInput = document.getElementById(`leftStrip_${index}`);
+            const leftPillInput = document.getElementById(`leftPill_${index}`);
+            const unitSelect = document.getElementById(`unitSold_${index}`);
+            const leftBox = document.getElementById(`leftStockBox_${index}`);
+            const medicineIdInput = document.getElementById(`medicineId_${index}`);
+
+
+            input.addEventListener("input", async () => {
+                const q = input.value.trim();
+                if (q.length < 1) {
+                    list.classList.add("hidden");
+                    list.innerHTML = "";
+                    return;
+                }
+
+                try {
+                    const res = await fetch(`/autocomplete?query=${encodeURIComponent(q)}`);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const data = await res.json();
+
+                    list.innerHTML = "";
+                    if (!Array.isArray(data) || data.length === 0) {
+                        list.classList.add("hidden");
+                        return;
+                    }
+
+                    data.forEach(item => {
+                        const div = document.createElement("div");
+                        div.className = "autocomplete-item";
+                        div.textContent = `${item.name}`;
+                        let leftStripData = 0;
+                        let leftPillData = 0;
+                        div.addEventListener("click", () => {
+                            input.value = item.name;
+                            if (stockInput) stockInput.value = item.quantity ?? 0;
+                            if (stripInput) stripInput.value = item.strip ?? 0;
+                            if (pillInput) pillInput.value = item.pill ?? 0;
+                            if (priceInput) priceInput.value = item.price ?? 0;
+                            leftStripData = item.left_strip ?? 0;
+                            leftPillData = item.left_pill ?? 0;
+                            if (medicineIdInput) medicineIdInput.value = item.id ?? "";
+                            list.classList.add("hidden");
+                            list.innerHTML = "";
+                        });
+                        list.appendChild(div);
+
+                        unitSelect.addEventListener("change", () => {
+                            if (unitSelect.value === "Vỉ" || unitSelect.value === "Viên") {
+                                leftBox.classList.remove("hidden");
+                                leftStripInput.value = leftStripData;
+                                leftPillInput.value = leftPillData;
+                            } else {
+                                leftBox.classList.add("hidden");
+                            }
+                        });
+
+                    });
+
+
+                    list.classList.remove("hidden");
+                } catch (e) {
+                    console.error(e);
+                    list.classList.add("hidden");
+                    list.innerHTML = "";
+                }
+            });
+
+            document.addEventListener("click", e => {
+                if (!list.contains(e.target) && e.target !== input) {
+                    list.classList.add("hidden");
+                    list.innerHTML = "";
+                }
+            });
+
+
+
+        }
+
+        // Khởi tạo autocomplete cho dòng đầu tiên
+        setupAutocomplete(0);
+
+        // Thêm dòng thuốc mới
+        let medicineCount = 1;
+        document.getElementById("addMedicine").addEventListener("click", () => {
+            const container = document.getElementById("medicineEntries");
+            const idx = medicineCount;
+            const div = document.createElement("div");
+            div.className = "medicine-entry space-y-4 border-b pb-4 relative";
+            div.innerHTML = `
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        <div class="relative">
+          <label for="medicineName_${idx}" class="block text-sm font-medium text-gray-700">Tên Thuốc</label>
+          <input type="text" id="medicineName_${idx}" name="medicineName_${idx}" class="mt-1 block w-full rounded-md border p-3" placeholder="Nhập tên thuốc" autocomplete="off">
+           <input type="hidden" id="medicineId_${idx}" name="medicineId_${idx}">
+          <div id="autocomplete_${idx}" class="autocomplete-list hidden"></div>
+        </div>
+        <div>
+          <label for="quantity_${idx}" class="block text-sm font-medium text-gray-700">Số lượng trong kho</label>
+          <input type="number" id="quantity_${idx}" name="quantity_${idx}" readonly class="mt-1 block w-full rounded-md border p-3 bg-gray-100">
+        </div>
+        <div>
+          <label for="strip_${idx}" class="block text-sm font-medium text-gray-700">Số Vĩ Trong Hộp</label>
+          <input type="number" id="strip_${idx}" name="strip_${idx}" min="1" class="mt-1 block w-full rounded-md border p-3">
+        </div>
+        <div>
+          <label for="pill_${idx}" class="block text-sm font-medium text-gray-700">Số Viên Trong 1 Vĩ</label>
+          <input type="number" id="pill_${idx}" name="pill_${idx}" min="1" class="mt-1 block w-full rounded-md border p-3">
+        </div>
+        <div>
+          <label for="price_${idx}" class="block text-sm font-medium text-gray-700">Giá Tiền (VND)</label>
+          <input type="number" id="price_${idx}" name="price_${idx}" min="0" step="0.01" class="mt-1 block w-full rounded-md border p-3">
+        </div>
+        <div>
+          <label for="unitSold_${idx}" class="block text-sm font-medium text-gray-700">Đơn Vị Bán</label>
+          <select id="unitSold_${idx}" name="unitSold_${idx}" class="mt-1 block w-full rounded-md border p-3">
+            <option value="Hộp">Hộp</option>
+            <option value="Vỉ">Vỉ</option>
+            <option value="Viên">Viên</option>
+          </select>
+        </div>
+
+            <div id="leftStockBox_${idx}" class="hidden grid grid-cols-2 gap-3 mt-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Vỉ đang bán dở</label>
+          <input type="number" id="leftStrip_${idx}" readonly 
+                 class="mt-1 block w-full rounded-md border p-3 bg-gray-100">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Viên đang bán dở</label>
+          <input type="number" id="leftPill_${idx}" readonly 
+                 class="mt-1 block w-full rounded-md border p-3 bg-gray-100">
+        </div>
+      </div>
+
+        <div>
+          <label for="quantitySold_${idx}" class="block text-sm font-medium text-gray-700">Số Lượng Bán</label>
+          <input type="number" id="quantitySold_${idx}" name="quantitySold_${idx}" min="1" class="mt-1 block w-full rounded-md border p-3">
+        </div>
+        <div>
+          <label for="totalAmount_${idx}" class="block text-sm font-medium text-gray-700">Thành Tiền (VND)</label>
+          <input type="number" id="totalAmount_${idx}" name="totalAmount_${idx}" readonly class="mt-1 block w-full rounded-md border p-3 bg-gray-100">
+        </div>
+      </div>
+    `;
+            container.appendChild(div);
+            setupAutocomplete(idx);
+            medicineCount++;
+        });
+
+        // Ngày mua mặc định hôm nay
+        window.addEventListener("DOMContentLoaded", () => {
+            const el = document.getElementById("purchaseDate");
+            if (el) el.value = new Date().toISOString().split("T")[0];
+        });
+
+
+        document.getElementById("sellMedicineForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            // Thông tin khách hàng
+            const customer_name = document.getElementById("username").value;
+            const hometown = document.getElementById("hometown").value;
+            const dob = document.getElementById("dateOfBirth").value;
+            const advice = document.getElementById("doctorAdvice").value;
+            const purchase_date = document.getElementById("purchaseDate").value;
+
+            // Gom thông tin tất cả thuốc
+            const medicines = [];
+            document.querySelectorAll(".medicine-entry").forEach((entry, idx) => {
+                const medicineId = entry.querySelector(`#medicineId_${idx}`)?.value;
+                const qty = entry.querySelector(`#quantitySold_${idx}`)?.value;
+                const unit = entry.querySelector(`#unitSold_${idx}`)?.value;
+
+                if (medicineId && qty && unit) {
+                    medicines.push({ medicine_id: medicineId, qty, unit });
+                }
+            });
+
+            if (medicines.length === 0) {
+                alert("Vui lòng nhập ít nhất 1 thuốc!");
+                return;
+            }
+
+            try {
+                const res = await fetch("/sell", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        customer_name,
+                        hometown,
+                        dob,
+                        advice,
+                        purchase_date,
+                        medicines
+                    })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById("result").textContent =
+                        `✅ Bán thành công! Tổng tiền: ${data.total_price.toLocaleString()} VND`;
+                } else {
+                    document.getElementById("result").textContent = `❌ Lỗi: ${data.error}`;
+                }
+            } catch (err) {
+                console.error(err);
+                document.getElementById("result").textContent = "❌ Có lỗi xảy ra khi gửi dữ liệu.";
+            }
+        });
+
+
+
+
+    </script>
+
+</body>
+
+</html>

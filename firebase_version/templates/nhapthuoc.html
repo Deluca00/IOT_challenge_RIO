@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,61 +11,28 @@
             background: linear-gradient(135deg, #e0f2fe, #bfdbfe);
             font-family: 'Inter', sans-serif;
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-        .card {
-            background: white;
-            border-radius: 1rem;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-            padding: 2rem;
-        }
-        .input-field {
-            transition: all 0.3s ease;
-        }
-        .input-field:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-        .btn {
-            transition: all 0.3s ease;
-        }
-        .btn:hover {
-            transform: translateY(-2px);
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 0.75rem;
-            text-align: left;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        th {
-            background: #f3f4f6;
-        }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div id="inputSection" class="card">
-            <div class="flex justify-between items-center mb-6">
-                <h1 class="text-2xl font-bold text-gray-800">Nhập Thông Tin Thuốc</h1>
-                <a class="btn bg-gray-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-gray-700">Quay về Trang chủ</a>
+
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="container max-w-4xl w-full mx-auto space-y-6">
+        <div id="inputSection" class="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6">
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Nhập Thông Tin Thuốc</h1>
+                <a href="/"
+                    class="mt-4 md:mt-0 btn bg-gray-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-gray-700 transition-transform duration-300 hover:-translate-y-0.5">Quay
+                    về Trang chủ</a>
             </div>
             <form id="medicineForm" class="space-y-4">
                 <div>
                     <label for="medicineName" class="block text-sm font-medium text-gray-700">Tên Thuốc</label>
                     <input type="text" id="medicineName" name="medicineName" required
-                        class="input-field mt-1 block w-full rounded-md border-gray-300 border p-2 focus:outline-none focus:ring focus:ring-blue-200">
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
                 </div>
                 <div>
                     <label for="medicineType" class="block text-sm font-medium text-gray-700">Loại Thuốc</label>
                     <select id="medicineType" name="medicineType" required
-                        class="input-field mt-1 block w-full rounded-md border-gray-300 border p-2 focus:outline-none focus:ring focus:ring-blue-200">
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
                         <option value="">Chọn loại thuốc</option>
                         <option value="Viên nén">Viên nén</option>
                         <option value="Viên nang">Viên nang</option>
@@ -75,123 +43,337 @@
                 </div>
                 <div>
                     <label for="medicineCode" class="block text-sm font-medium text-gray-700">Mã Code</label>
-                    <input type="text" id="medicineCode" name="medicineCode" required
-                                value="{{ barcode }}"
-                                {% if barcode %} readonly {% endif %}
+                    <input type="text" id="medicineCode" name="medicineCode" required value="{{ barcode }}"
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
+                </div>
+                <div id="existingInfo" class="hidden bg-gray-100 p-3 rounded-md text-sm text-gray-700 mb-2"></div>
+                <div>
+                    <label for="medicineQuantity" class="block text-sm font-medium text-gray-700">Số lượng</label>
+                    <input type="number" id="medicineQuantity" name="medicineQuantity" required min="0"
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
+                </div>
+                <div>
+                    <label for="medicinePrice" class="block text-sm font-medium text-gray-700">Giá (VND)</label>
+                    <input type="number" id="medicinePrice" name="medicinePrice" required min="0" step="0.01"
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
+                </div>
+
+                <div>
+                    <label for="stripsPerBox" class="block text-sm font-medium text-gray-700">Số vỉ / hộp</label>
+                    <input type="number" id="stripsPerBox" name="stripsPerBox" required
+                        class="input-field mt-1 block w-full rounded-md border-gray-300 border p-2 focus:outline-none focus:ring focus:ring-blue-200">
+                </div>
+
+                <div>
+                    <label for="pillsPerStrip" class="block text-sm font-medium text-gray-700">Số viên / vỉ</label>
+                    <input type="number" id="pillsPerStrip" name="pillsPerStrip" required
                         class="input-field mt-1 block w-full rounded-md border-gray-300 border p-2 focus:outline-none focus:ring focus:ring-blue-200">
                 </div>
                 <div>
                     <label for="manufacturingDate" class="block text-sm font-medium text-gray-700">Ngày Sản Xuất</label>
                     <input type="date" id="manufacturingDate" name="manufacturingDate" required
-                        class="input-field mt-1 block w-full rounded-md border-gray-300 border p-2 focus:outline-none focus:ring focus:ring-blue-200">
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
                 </div>
                 <div>
                     <label for="expirationDate" class="block text-sm font-medium text-gray-700">Hạn Sử Dụng</label>
                     <input type="date" id="expirationDate" name="expirationDate" required
-                        class="input-field mt-1 block w-full rounded-md border-gray-300 border p-2 focus:outline-none focus:ring focus:ring-blue-200">
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
                 </div>
                 <button type="submit"
-                    class="btn w-full bg-blue-600 text-white font-semibold py-2 rounded-md hover:bg-blue-700">Lưu Thông Tin</button>
+                    class="btn w-full bg-blue-600 text-white font-semibold py-2 rounded-md hover:bg-blue-700 transition-transform duration-300 hover:-translate-y-0.5">Lưu
+                    Thông Tin</button>
             </form>
             <div id="result" class="mt-4 text-center text-gray-600"></div>
-            <button id="viewListButton" class="btn mt-4 w-full bg-gray-600 text-white font-semibold py-2 rounded-md hover:bg-gray-700">Xem Danh Sách Thuốc</button>
+            <button id="viewListButton"
+                class="btn mt-4 w-full bg-gray-600 text-white font-semibold py-2 rounded-md hover:bg-gray-700 transition-transform duration-300 hover:-translate-y-0.5">Xem
+                Danh Sách Thuốc</button>
         </div>
 
-        <div id="listSection" class="card hidden mt-4">
-            <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">Danh Sách Thuốc</h1>
-            <table id="medicineTable">
-                <thead>
-                    <tr>
-                        <th>Tên Thuốc</th>
-                        <th>Loại Thuốc</th>
-                        <th>Mã Code</th>
-                        <th>Ngày Sản Xuất</th>
-                        <th>Hạn Sử Dụng</th>
-                        <th>Hành Động</th>
-                    </tr>
-                </thead>
-                <tbody id="medicineList"></tbody>
-            </table>
-            <button id="backButton" class="btn mt-4 w-full bg-gray-600 text-white font-semibold py-2 rounded-md hover:bg-gray-700">Quay Về</button>
+        <div id="listSection" class="card hidden bg-white rounded-2xl shadow-xl p-6 md:p-8">
+            <h1 class="text-2xl md:text-3xl font-bold text-center text-gray-800 mb-6">Danh Sách Thuốc</h1>
+            <div class="overflow-x-auto">
+                <table id="medicineTable" class="w-full border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="p-3 text-left text-sm font-semibold text-gray-700">Tên Thuốc</th>
+                            <th class="p-3 text-left text-sm font-semibold text-gray-700">Loại Thuốc</th>
+                            <th class="p-3 text-left text-sm font-semibold text-gray-700">Mã Code</th>
+                            <th class="p-3 text-left text-sm font-semibold text-gray-700">Số lượng</th>
+                            <th class="p-3 text-left text-sm font-semibold text-gray-700">Giá</th>
+                            <th class="p-3 text-left text-sm font-semibold text-gray-700">Số vỉ</th>
+                            <th class="p-3 text-left text-sm font-semibold text-gray-700">Số viên/1 vĩ</th>
+                            <th class="p-3 text-left text-sm font-semibold text-gray-700">Ngày Sản Xuất</th>
+                            <th class="p-3 text-left text-sm font-semibold text-gray-700">Hạn Sử Dụng</th>
+                            <th class="p-3 text-left text-sm font-semibold text-gray-700">Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="medicineList"></tbody>
+                </table>
+            </div>
+            <button id="backButton"
+                class="btn mt-4 w-full bg-gray-600 text-white font-semibold py-2 rounded-md hover:bg-gray-700 transition-transform duration-300 hover:-translate-y-0.5">Quay
+                Về</button>
         </div>
     </div>
 
-<script>
-    document.getElementById('medicineForm').addEventListener('submit', async function(event) {
-        event.preventDefault();
+    <div id="editModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-xl p-6 w-full max-w-lg">
+            <h2 class="text-xl md:text-2xl font-semibold mb-4">Sửa Thuốc</h2>
+            <form id="editForm" class="space-y-4">
+                <input type="hidden" id="editId">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Tên thuốc</label>
+                    <input id="editName"
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Loại thuốc</label>
+                    <select id="editType"
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
+                        <option value="Viên nén">Viên nén</option>
+                        <option value="Viên nang">Viên nang</option>
+                        <option value="Dung dịch">Dung dịch</option>
+                        <option value="Thuốc tiêm">Thuốc tiêm</option>
+                        <option value="Khác">Khác</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Mã code</label>
+                    <input id="editCode"
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Số lượng</label>
+                    <input id="editQuantity" type="number" min="0"
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Giá (VND)</label>
+                    <input id="editPrice" type="number" min="0" step="0.01"
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
+                </div>
 
-        const medicine = {
-            name: document.getElementById('medicineName').value,
-            type: document.getElementById('medicineType').value,
-            code: document.getElementById('medicineCode').value,
-            manuDate: document.getElementById('manufacturingDate').value,
-            expDate: document.getElementById('expirationDate').value
-        };
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Số vĩ </label>
+                    <input id="editStrips" type="number" min="0"
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Số vien/ 1 vĩ</label>
+                    <input id="editPills" type="number" min="0"
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Ngày SX</label>
+                    <input id="editManu" type="date"
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Hạn SD</label>
+                    <input id="editExp" type="date"
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeEdit()"
+                        class="btn bg-gray-200 px-4 py-2 rounded-md hover:bg-gray-300 transition-transform duration-300">Hủy</button>
+                    <button type="submit"
+                        class="btn bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-transform duration-300">Lưu</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        const response = await fetch('/save_medicine', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(medicine)
+    <script>
+        window.ROLE = "{{ role or '' }}"; // "admin" hoặc "staff"
+
+        document.getElementById('medicineCode').addEventListener('change', async function () {
+            const code = this.value.trim();
+            if (!code) return;
+
+            const res = await fetch(`/get_medicine/${code}`);
+            const data = await res.json();
+            const infoBox = document.getElementById('existingInfo');
+
+            if (data.exists) {
+                const med = data.medicine;
+                infoBox.classList.remove('hidden');
+                infoBox.innerHTML = `
+                    <p><b>Đã có trong kho:</b></p>
+                    <p>Số lượng hiện tại: ${med.quantity}</p>
+                `;
+                document.getElementById('medicineName').value = med.name;
+                document.getElementById('medicineType').value = med.type;
+                document.getElementById('stripsPerBox').value = med.strip || '';// vĩ
+                document.getElementById('pillsPerStrip').value = med.pill || '';// viên
+                document.getElementById('medicinePrice').value = med.price || 0;
+                document.getElementById('manufacturingDate').value = med.manu_date ? med.manu_date.substring(0, 10) : "";
+                document.getElementById('expirationDate').value = med.exp_date ? med.exp_date.substring(0, 10) : "";
+                document.getElementById('medicineName').readOnly = true;
+                document.getElementById('medicineType').disabled = true;
+                document.getElementById('stripsPerBox').disabled = true;
+                document.getElementById('pillsPerStrip').disabled = true; 
+                document.getElementById('medicinePrice').disabled = true;
+                document.getElementById('manufacturingDate').readOnly = true;
+                document.getElementById('expirationDate').readOnly = true;
+            } else {
+                infoBox.classList.add('hidden');
+                document.getElementById('medicineName').readOnly = false;
+                document.getElementById('medicineType').disabled = false;
+                document.getElementById('manufacturingDate').readOnly = false;
+                document.getElementById('stripsPerBox').disabled = false;
+                document.getElementById('pillsPerStrip').disabled = false;
+                document.getElementById('medicinePrice').disabled = false;
+                document.getElementById('expirationDate').readOnly = false;
+                document.getElementById('medicineForm').reset();
+                document.getElementById('medicineCode').value = code;
+            }
         });
 
-        const result = await response.json();
-        if (result.success) {
-            document.getElementById('result').innerHTML = '<span class="text-green-600">Lưu thuốc thành công!</span>';
-            this.reset();
-        } else {
-            document.getElementById('result').innerHTML = '<span class="text-red-600">Lỗi: ' + result.error + '</span>';
-        }
-    });
+        document.getElementById('medicineForm').addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const medicine = {
+                name: document.getElementById('medicineName').value,
+                type: document.getElementById('medicineType').value,
+                code: document.getElementById('medicineCode').value,
+                quantity: document.getElementById('medicineQuantity').value,
+                price: document.getElementById('medicinePrice').value,
+                strips: document.getElementById('stripsPerBox').value,
+                pills: document.getElementById('pillsPerStrip').value,
+                manuDate: document.getElementById('manufacturingDate').value,
+                expDate: document.getElementById('expirationDate').value
+            };
+            const response = await fetch('/save_medicine', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(medicine)
+            });
+            const result = await response.json();
+            if (result.success) {
+                document.getElementById('result').innerHTML = '<span class="text-green-600">Lưu thuốc thành công!</span>';
+                this.reset();
+            } else {
+                document.getElementById('result').innerHTML = '<span class="text-red-600">Lỗi: ' + result.error + '</span>';
+            }
+        });
 
-    document.getElementById('viewListButton').addEventListener('click', async () => {
-        const response = await fetch('/list_medicine');
-        const result = await response.json();
-        const medicines = result.data;
-
-        const tbody = document.getElementById('medicineList');
-        tbody.innerHTML = '';
-
-        medicines.forEach(med => {
-          const row = document.createElement('tr');
-                 row.innerHTML = `
-                  <td>${med.name}</td>
-                  <td>${med.type}</td>
-                  <td>${med.code}</td>
-                  <td>${med.manu_date}</td>
-                  <td>${med.exp_date}</td>
-                  <td>
-                   <button onclick="deleteMedicine('${med.id}')"
-                    class="btn bg-red-500 text-white px-2 py-1 rounded-md hover:bg-red-600">
+        document.getElementById('viewListButton').addEventListener('click', async () => {
+            const response = await fetch('/list_medicine');
+            const result = await response.json();
+            const medicines = result.data;
+            const tbody = document.getElementById('medicineList');
+            tbody.innerHTML = '';
+            medicines.forEach(med => {
+                const canAdmin = (window.ROLE === 'admin');
+                const actions = canAdmin
+                    ? `
+                        <button onclick="openEdit('${med.id}', '${med.name}', '${med.type}', '${med.quantity}','${med.price}','${med.strip}',${med.pill}, '${med.code}', '${med.manu_date}', '${med.exp_date}')"
+                            class="btn bg-yellow-500 text-white px-2 py-1 rounded-md hover:bg-yellow-600 mr-2 transition-transform duration-300">
+                            Sửa
+                        </button>
+                        <button onclick="deleteMedicine('${med.id}')"
+                            class="btn bg-red-500 text-white px-2 py-1 rounded-md hover:bg-red-600 transition-transform duration-300">
                             Xóa
-                   </button>
-                     </td>
-               `;                
-              tbody.appendChild(row);
-});
+                        </button>
+                    `
+                    : `<span class="text-gray-400 italic">Không có quyền</span>`;
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="p-3">${med.name}</td>
+                    <td class="p-3">${med.type}</td>
+                    <td class="p-3">${med.code}</td>
+                    <td class="p-3">${med.quantity}</td>
+                    <td class="p-3">${med.price || 0}</td> 
+                    <td class="p-3">${med.strip}</td>
+                    <td class="p-3">${med.pill}</td>
+                    <td class="p-3">${med.manu_date}</td>
+                    <td class="p-3">${med.exp_date}</td>
+                    <td class="p-3">${actions}</td>
+                `;
+                tbody.appendChild(row);
+            });
+            document.getElementById('inputSection').classList.add('hidden');
+            document.getElementById('listSection').classList.remove('hidden');
+        });
 
-        document.getElementById('inputSection').classList.add('hidden');
-        document.getElementById('listSection').classList.remove('hidden');
-    });
-
-    async function deleteMedicine(id) {
-        if (!confirm('Bạn có chắc chắn muốn xóa thuốc này?')) return;
-
-        const response = await fetch('/delete_medicine/' + id, { method: 'DELETE' });
-        const result = await response.json();
-        if (result.success) {
-            alert("Xóa thành công!");
-            document.getElementById('viewListButton').click(); // reload list
-        } else {
-            alert("Xóa thất bại: " + result.error);
+        async function deleteMedicine(id) {
+            if (!confirm('Bạn có chắc chắn muốn xóa thuốc này?')) return;
+            const response = await fetch('/delete_medicine/' + id, { method: 'DELETE' });
+            const result = await response.json();
+            if (result.success) {
+                alert("Xóa thành công!");
+                document.getElementById('viewListButton').click();
+            } else {
+                alert("Xóa thất bại: " + result.error);
+            }
         }
-    }
 
-    document.getElementById('backButton').addEventListener('click', () => {
-        document.getElementById('inputSection').classList.remove('hidden');
-        document.getElementById('listSection').classList.add('hidden');
+        document.getElementById('backButton').addEventListener('click', () => {
+            document.getElementById('inputSection').classList.remove('hidden');
+            document.getElementById('listSection').classList.add('hidden');
+        });
 
-    });
-</script>
+        function openEdit(id, name, type, quantity,price, strip, pill, code, manu, exp) {
+            if (window.ROLE !== 'admin') {
+                alert('Bạn không có quyền sửa');
+                return;
+            }
+            document.getElementById('editId').value = id;
+            document.getElementById('editName').value = name || '';
+            document.getElementById('editType').value = type || '';
+            document.getElementById('editCode').value = code || '';
+            document.getElementById('editQuantity').value = quantity || 0;
+            document.getElementById('editPrice').value = price || 0; 
+            document.getElementById('editStrips').value = strip || 0;
+            document.getElementById('editPills').value = pill || 0;
+            document.getElementById('editManu').value = (manu || '').substring(0, 10);
+            document.getElementById('editExp').value = (exp || '').substring(0, 10);
+            document.getElementById('editModal').classList.remove('hidden');
+            document.getElementById('editModal').classList.add('flex');
+        }
 
+        function closeEdit() {
+            document.getElementById('editModal').classList.add('hidden');
+            document.getElementById('editModal').classList.remove('flex');
+        }
+
+        document.getElementById('editForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editId').value;
+            const payload = {
+                name: document.getElementById('editName').value,
+                type: document.getElementById('editType').value,
+                code: document.getElementById('editCode').value,
+                strips: document.getElementById('editStrips').value,
+                pills: document.getElementById('editPills').value,
+                quantity: document.getElementById('editQuantity').value,
+                price: document.getElementById('editPrice').value,
+                manuDate: document.getElementById('editManu').value,
+                expDate: document.getElementById('editExp').value
+                
+            };
+            fetch(`/update_medicine/${id}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Cập nhật thành công!");
+                        location.reload();
+                    } else {
+                        alert("Lỗi: " + data.error);
+                    }
+                });
+        });
+
+        window.addEventListener("DOMContentLoaded", function () {
+            const codeInput = document.getElementById('medicineCode');
+            if (codeInput.value.trim()) {
+                codeInput.dispatchEvent(new Event('change'));
+            }
+        });
+    </script>
 </body>
+
 </html>

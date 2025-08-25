@@ -1,4 +1,4 @@
-from flask import Flask, Response, render_template,request, redirect, url_for, session
+from flask import Flask, Response, render_template,request, redirect, url_for, session, jsonify
 import cv2
 import threading
 import time
@@ -113,15 +113,24 @@ def root():
         return render_template("login.html")
     return redirect(url_for("dashboard"))
 
+# Users demo (có thể thay bằng bảng users sau này)
+USERS = {
+    "admin@test.com": {"password": "123456", "role": "admin"},
+    "staff@test.com": {"password": "123456", "role": "staff"},
+}
+
+
 @app.route("/login", methods=["POST"])
 def login():
-    # Tạm thời hardcode user/pass để test
     email = request.form.get("email")
     password = request.form.get("password")
-    if email == "admin@test.com" and password == "123456":
+    user = USERS.get(email)
+    if user and user["password"] == password:
         session["uid"] = email
+        session["role"] = user["role"]  # <-- lưu role
         return redirect(url_for("dashboard"))
     return render_template("login.html", error="Sai tài khoản hoặc mật khẩu")
+
 
 
 @app.route("/dashboard")
@@ -134,7 +143,7 @@ def dashboard():
         {"id": 3, "name": "Camera 3: Nhà kho"},
         {"id": 4, "name": "Camera 4: Văn phòng"},
     ]
-    return render_template("index.html", cameras=cameras)
+    return render_template("index.html", cameras=cameras,role=session.get("role"))
 # @app.route("/nhapthuoc")
 # def nhapthuoc():
 #     if "uid" not in session:   # bắt buộc login
@@ -203,28 +212,60 @@ def scan_barcode():
 
 @app.route("/nhapthuoc")
 def nhapthuoc():
-    barcode = request.args.get('barcode', '')  # <--- dùng đúng tên query param
-    return render_template('nhapthuoc.html', barcode=barcode)
+    barcode = request.args.get('barcode', '')
+    return render_template('nhapthuoc.html', barcode=barcode, role=session.get("role"))
+
+@app.route("/get_medicine/<code>", methods=["GET"])
+def get_medicine(code):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM medicines WHERE code=?", (code,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return {"exists": True, "medicine": dict(row)}
+    return {"exists": False}
+
 
 @app.route("/save_medicine", methods=["POST"])
 def save_medicine():
     data = request.get_json()
     conn = get_connection()
     c = conn.cursor()
-    c.execute("""
-        INSERT INTO medicines (name, type, code, manu_date, exp_date)
-        VALUES (?, ?, ?, ?, ?)
-    """, (
-        data.get("name"),
-        data.get("type"),
-        data.get("code"),
-        data.get("manuDate"),
-        data.get("expDate"),
-    ))
-    conn.commit()
-    new_id = c.lastrowid
-    conn.close()
-    return {"success": True, "id": new_id}
+
+    # kiểm tra mã thuốc có tồn tại không
+    c.execute("SELECT * FROM medicines WHERE code=?", (data.get("code"),))
+    row = c.fetchone()
+
+    if row:
+        # cập nhật số lượng (cộng dồn)
+        current_qty = int(row["quantity"] or 0)
+        add_qty = int(data.get("quantity") or 0)
+        new_qty = current_qty + add_qty
+        c.execute("UPDATE medicines SET quantity=? WHERE code=?", (str(new_qty), data.get("code")))
+        conn.commit()
+        conn.close()
+        return {"success": True, "updated": True, "new_quantity": new_qty}
+    else:
+        # thêm thuốc mới
+        c.execute("""
+            INSERT INTO medicines (name, type, code, quantity,price,strip,pill, manu_date, exp_date)
+            VALUES (?, ?, ?, ?, ?, ?,?,?,?)
+        """, (
+            data.get("name"),
+            data.get("type"),
+            data.get("code"),
+            data.get("quantity"),
+            data.get("price"),
+            data.get("strips"),
+            data.get("pills"),
+            data.get("manuDate"),
+            data.get("expDate"),
+        ))
+        conn.commit()
+        new_id = c.lastrowid
+        conn.close()
+        return {"success": True, "id": new_id, "updated": False}
 
 
 @app.route("/list_medicine", methods=["GET"])
@@ -242,6 +283,8 @@ def list_medicine():
 def delete_medicine(med_id):
     if "uid" not in session:
         return {"success": False, "error": "Chưa đăng nhập"}, 403
+    if session.get("role") != "admin":
+        return {"success": False, "error": "Không có quyền xoá"}, 403
 
     try:
         conn = get_connection()
@@ -252,6 +295,244 @@ def delete_medicine(med_id):
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+@app.route("/update_medicine/<int:med_id>", methods=["POST"])
+def update_medicine(med_id):
+    if "uid" not in session:
+        return {"success": False, "error": "Chưa đăng nhập"}, 403
+    try:
+        data = request.get_json()
+        print("DEBUG JSON:", data)   # ✅ log dữ liệu nhận được
+        if not data:
+            return {"success": False, "error": "Không nhận được dữ liệu JSON"}
+
+        name = data.get("name")
+        type_ = data.get("type")
+        code = data.get("code")
+        quantity = data.get("quantity")  # Số lượng, mặc định là 0 nếu không có
+        price = data.get("price")
+        strips = data.get("strips")
+        pills = data.get("pills")
+        manuDate = data.get("manuDate")
+        expDate = data.get("expDate")
+
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute(
+            """
+            UPDATE medicines
+            SET name=?, type=?, code=?,quantity=?,price=?,strip=?,pill=?, manu_date=?, exp_date=?
+            WHERE id=?
+            """,
+            (name, type_, code,quantity,price,strips,pills, manuDate, expDate, med_id),
+        )
+        conn.commit()
+        print("DEBUG rowcount:", c.rowcount)  # ✅ số dòng bị ảnh hưởng
+        conn.close()
+        return {"success": True, "updated": c.rowcount}
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return {"success": False, "error": str(e)}
+    
+@app.route("/banthuoc")
+def banthuoc_page():
+    if "uid" not in session:  # bắt buộc login
+        return redirect(url_for("root"))
+    return render_template("banthuoc.html")
+
+
+@app.route("/autocomplete")
+def autocomplete():
+    query = request.args.get("query", "").strip().lower()
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT name, quantity, strip, pill, price, left_strip, left_pill,id
+        FROM medicines
+        WHERE LOWER(name) LIKE ?
+    """, (f"%{query}%",))
+    rows = c.fetchall()
+    conn.close()
+
+    results = [
+        {
+            "name": row["name"],           
+            "quantity": row["quantity"],
+            "strip": row["strip"],
+            "pill": row["pill"],
+            "left_strip": row["left_strip"],
+            "left_pill": row["left_pill"],
+            "price": row["price"],
+            "id": row["id"]
+        }
+        for row in rows
+    ]
+    return jsonify(results)
+
+
+def process_sale(medicine, unit, qty):
+    """
+    medicine: row lấy từ bảng medicines (sqlite Row)
+    unit: 'Hộp' / 'Vỉ' / 'Viên'
+    qty: số lượng cần bán
+    """
+    quantity = int(medicine["quantity"])      # số hộp nguyên
+    strip = int(medicine["strip"])            # số vỉ / hộp
+    pill = int(medicine["pill"])              # số viên / vỉ
+    left_strip = int(medicine["left_strip"])  # vỉ dư hộp đang bán
+    left_pill = int(medicine["left_pill"])    # viên dư vỉ đang bán
+
+    # ---- Case 1: Bán theo HỘP ----
+    if unit == "Hộp":
+        if quantity < qty:
+            raise ValueError("Không đủ hộp trong kho")
+        quantity -= qty
+
+    # ---- Case 2: Bán theo VỈ ----
+    elif unit == "Vỉ":
+        need = qty
+
+        # dùng vỉ dư trước
+        if left_strip >= need:
+            left_strip -= need
+            need = 0
+        else:
+            need -= left_strip
+            left_strip = 0
+
+        # nếu vẫn cần → khui hộp mới (-1 hộp)
+        while need > 0:
+            if quantity <= 0:
+                raise ValueError("Không đủ vỉ trong kho")
+            quantity -= 1
+            total_v = strip
+            if total_v >= need:
+                # bán số vỉ cần, dư thì cộng lại
+                left_strip += total_v - need
+                need = 0
+            else:
+                # bán hết hộp, vẫn chưa đủ
+                need -= total_v
+
+    # ---- Case 3: Bán theo VIÊN ----
+    elif unit == "Viên":
+        need = qty
+
+        # dùng viên dư trước
+        if left_pill >= need:
+            left_pill -= need
+            need = 0
+        else:
+            need -= left_pill
+            left_pill = 0
+
+        # nếu vẫn cần → lấy từ vỉ dư trước
+        if need > 0 and left_strip > 0:
+            while need > 0 and left_strip > 0:
+                if pill >= need:
+                    left_pill += pill - need
+                    need = 0
+                    left_strip -= 1
+                else:
+                    need -= pill
+                    left_strip -= 1
+
+        # nếu vẫn cần → khui hộp mới (-1 hộp)
+        while need > 0:
+            if quantity <= 0:
+                raise ValueError("Không đủ viên trong kho")
+            quantity -= 1
+            total_v = strip * pill  # tổng số viên trong hộp
+            if total_v >= need:
+                # bán số viên cần, dư thì chia lại thành vỉ + viên
+                full_strip, remain_pill = divmod(total_v - need, pill)
+                left_strip += full_strip
+                left_pill += remain_pill
+                need = 0
+            else:
+                # bán hết hộp vẫn chưa đủ
+                need -= total_v
+
+    else:
+        raise ValueError("Đơn vị không hợp lệ")
+
+    return quantity, left_strip, left_pill
+
+@app.route("/sell", methods=["POST"])
+def sell():
+    data = request.get_json()
+    customer_name = data.get("customer_name", "")
+    hometown = data.get("hometown", "")
+    dob = data.get("dob", "")
+    advice = data.get("advice", "")
+    purchase_date = data.get("purchase_date", "")
+    medicines = data.get("medicines", [])
+
+    if not medicines:
+        return jsonify({"error": "Chưa chọn thuốc"}), 400
+
+    conn = get_connection()
+    c = conn.cursor()
+    total_price_all = 0
+
+    try:
+        for item in medicines:
+            medicine_id = item["medicine_id"]
+            qty = int(item["qty"])
+            unit = item["unit"]
+
+            med = c.execute("SELECT * FROM medicines WHERE id=?", (medicine_id,)).fetchone()
+            if med is None:
+                raise ValueError(f"Không tìm thấy thuốc id={medicine_id}")
+
+            new_quantity, new_left_strip, new_left_pill = process_sale(med, unit, qty)
+
+            # Tính giá
+            price_per_box = float(med["price"])
+            strip = int(med["strip"])
+            pill = int(med["pill"])
+
+            if unit == "Hộp":
+                total_price = price_per_box * qty
+            elif unit == "Vỉ":
+                total_price = (price_per_box / strip) * qty
+            elif unit == "Viên":
+                total_price = (price_per_box / (strip * pill)) * qty
+            else:
+                total_price = 0
+
+            total_price_all += total_price
+
+            # Cập nhật kho
+            c.execute("""
+                UPDATE medicines 
+                SET quantity=?, left_strip=?, left_pill=? 
+                WHERE id=?
+            """, (new_quantity, new_left_strip, new_left_pill, medicine_id))
+
+            # Ghi vào sales
+            c.execute("""
+                INSERT INTO sales (medicine_id, customer_name, hometown, dob, unit, quantity, total_price, advice, purchase_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (medicine_id, customer_name, hometown, dob, unit, qty, total_price, advice, purchase_date))
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({"error": str(e)}), 400
+
+    conn.close()
+    return jsonify({"success": True, "total_price": total_price_all})
+
+
+
+@app.route("/me")
+def me():
+    if "uid" not in session:
+        return {"logged_in": False}
+    return {"logged_in": True, "email": session["uid"], "role": session.get("role")}
+
 
 
 
@@ -296,7 +577,7 @@ if __name__ == "__main__":
     # Tạm thời HTTP (chỉ chạy trong LAN hoặc khi bạn không cần getUserMedia nữa)
     
     
-     app.run( 
+    app.run( 
         host="0.0.0.0",
         port=5000,
         ssl_context=("192.168.1.9.pem", "192.168.1.9-key.pem"))
