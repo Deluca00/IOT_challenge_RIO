@@ -11,10 +11,6 @@
 #define SENSOR4 9
 
 // Biến trạng thái motor
-bool motor1Running = false;
-bool motor2Running = false;
-bool motor3Running = false;
-bool motor4Running = false;
 
 void setup() {
   Serial.begin(9600);
