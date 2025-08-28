@@ -648,6 +648,6 @@ if __name__ == "__main__":
     app.run( 
         host="0.0.0.0",
         port=5000,
-        ssl_context=("192.168.1.9.pem", "192.168.1.9-key.pem"))
+        ssl_context=("server.pem", "server-key.pem"))
     # app.run(host="0.0.0.0", port=5000, debug=True)
 
