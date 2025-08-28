@@ -1,4 +1,5 @@
 #!/bin/bash
+chmod +x SmartMed.sh
 set -e
 
 APP_DIR="/home/deluca/Project/IOT_2025/IOT_challenge_RIO/firebase_version"
