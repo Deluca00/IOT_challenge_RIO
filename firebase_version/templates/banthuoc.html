@@ -128,6 +128,7 @@
                                     <option value="Hộp">Hộp</option>
                                     <option value="Vỉ">Vỉ</option>
                                     <option value="Viên">Viên</option>
+
                                 </select>
                             </div>
 
@@ -182,8 +183,8 @@
                 </div>
 
                 <button type="submit"
-                    class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700">Lưu Thông
-                    Tin</button>
+                    class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700">Xác nhận
+                    bán thuốc</button>
             </form>
             <div id="result" class="mt-4 text-center text-gray-600"></div>
         </div>
@@ -203,6 +204,7 @@
             const unitSelect = document.getElementById(`unitSold_${index}`);
             const leftBox = document.getElementById(`leftStockBox_${index}`);
             const medicineIdInput = document.getElementById(`medicineId_${index}`);
+
 
 
             input.addEventListener("input", async () => {
@@ -276,8 +278,42 @@
 
         }
 
+        function setupCalculation(index) {
+            const qtyInput = document.getElementById(`quantitySold_${index}`);
+            const priceInput = document.getElementById(`price_${index}`);
+            const stripInput = document.getElementById(`strip_${index}`);
+            const pillInput = document.getElementById(`pill_${index}`);
+            const unitSelect = document.getElementById(`unitSold_${index}`);
+            const totalInput = document.getElementById(`totalAmount_${index}`);
+
+            function calculate() {
+                const qty = parseFloat(qtyInput.value) || 0;
+                const price = parseFloat(priceInput.value) || 0;
+                const strip = parseFloat(stripInput.value) || 1;
+                const pill = parseFloat(pillInput.value) || 1;
+                let total = 0;
+
+                if (unitSelect.value === "Hộp") {
+                    total = qty * price;
+                } else if (unitSelect.value === "Vỉ") {
+                    total = qty * (price / strip);
+                } else if (unitSelect.value === "Viên") {
+                    total = qty * (price / (strip * pill));
+                }
+
+                totalInput.value = Math.round(total); // làm tròn VNĐ
+            }
+
+            qtyInput.addEventListener("input", calculate);
+            priceInput.addEventListener("input", calculate);
+            unitSelect.addEventListener("change", calculate);
+        }
+
+
         // Khởi tạo autocomplete cho dòng đầu tiên
         setupAutocomplete(0);
+
+        setupCalculation(0);
 
         // Thêm dòng thuốc mới
         let medicineCount = 1;
@@ -344,6 +380,7 @@
     `;
             container.appendChild(div);
             setupAutocomplete(idx);
+            setupCalculation(idx);
             medicineCount++;
         });
 
@@ -395,13 +432,31 @@
                     })
                 });
 
-                const data = await res.json();
-                if (res.ok) {
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
                     document.getElementById("result").textContent =
-                        `✅ Bán thành công! Tổng tiền: ${data.total_price.toLocaleString()} VND`;
-                } else {
-                    document.getElementById("result").textContent = `❌ Lỗi: ${data.error}`;
+                        `❌ Lỗi: ${data.error || "Không thể tạo hóa đơn"}`;
+                    return;
                 }
+
+                // ✅ Nhận file PDF thay vì JSON
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+
+                // Tạo link ẩn để tải về
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "hoadon.pdf";  // tên file tải xuống
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+
+                window.URL.revokeObjectURL(url);
+
+                // Thông báo thành công
+                document.getElementById("result").innerHTML =
+                    `✅ Bán thành công! Hóa đơn đã được tải về.`;
+
             } catch (err) {
                 console.error(err);
                 document.getElementById("result").textContent = "❌ Có lỗi xảy ra khi gửi dữ liệu.";

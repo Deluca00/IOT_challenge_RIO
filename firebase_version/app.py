@@ -1,4 +1,10 @@
-from flask import Flask, Response, render_template,request, redirect, url_for, session, jsonify
+from flask import Flask, Response, render_template,request, redirect, url_for, session, jsonify, send_file
+import io
+import datetime 
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 import cv2
 import threading
 import time
@@ -6,6 +12,8 @@ import numpy as np
 import base64
 from pyzbar.pyzbar import decode
 from database import get_connection, init_db
+import os
+
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey" 
@@ -458,6 +466,51 @@ def process_sale(medicine, unit, qty):
 
     return quantity, left_strip, left_pill
 
+pdfmetrics.registerFont(TTFont("DejaVu", "DejaVuSans.ttf"))
+
+def generate_invoice_pdf(customer_name, hometown, dob, purchase_date, medicines, total_price_all):
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    # ---- Header ----
+    p.setFont("DejaVu", 16)
+    p.drawString(200, height - 50, "HÓA ĐƠN MUA THUỐC")
+
+    p.setFont("DejaVu", 10)
+    p.drawString(50, height - 80, f"Tên khách hàng: {customer_name}")
+    p.drawString(50, height - 100, f"Quê quán: {hometown}")
+    p.drawString(50, height - 120, f"Ngày sinh: {dob}")
+    p.drawString(50, height - 140, f"Ngày mua: {purchase_date or datetime.date.today().isoformat()}")
+
+    # ---- Table header ----
+    y = height - 180
+    p.setFont("DejaVu", 10)
+    p.drawString(50, y, "Tên thuốc")
+    p.drawString(200, y, "Đơn vị")
+    p.drawString(260, y, "Số lượng")
+    p.drawString(330, y, "Thành tiền")
+
+    # ---- Medicines ----
+    p.setFont("DejaVu", 10)
+    y -= 20
+    for m in medicines:
+        p.drawString(50, y, m["name"])
+        p.drawString(200, y, m["unit"])
+        p.drawString(260, y, str(m["qty"]))
+        p.drawString(330, y, f"{m['total_price']:.0f} VND")
+        y -= 20
+
+    # ---- Total ----
+    p.setFont("DejaVu", 12)
+    p.drawString(50, y - 20, f"Tổng cộng: {total_price_all:.0f} VND")
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    return buffer
+
+
 @app.route("/sell", methods=["POST"])
 def sell():
     data = request.get_json()
@@ -474,7 +527,7 @@ def sell():
     conn = get_connection()
     c = conn.cursor()
     total_price_all = 0
-
+    sold_items = []
     try:
         for item in medicines:
             medicine_id = item["medicine_id"]
@@ -516,6 +569,13 @@ def sell():
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (medicine_id, customer_name, hometown, dob, unit, qty, total_price, advice, purchase_date))
 
+            sold_items.append({
+                "name": med["name"],
+                "unit": unit,
+                "qty": qty,
+                "total_price": total_price
+            })
+
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -523,7 +583,15 @@ def sell():
         return jsonify({"error": str(e)}), 400
 
     conn.close()
-    return jsonify({"success": True, "total_price": total_price_all})
+    rpdf_buffer = generate_invoice_pdf(customer_name, hometown, dob, purchase_date, sold_items, total_price_all)
+
+    # Lưu file vào static/invoices
+    return send_file(
+        rpdf_buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="hoadon.pdf"   # tên file khi tải về
+    )
 
 
 
