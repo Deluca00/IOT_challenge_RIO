@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Barcode Scanner – 2 Cameras</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen">
+  <header class="bg-indigo-600 text-white py-4 shadow">
+    <div class="container mx-auto px-4">
+      <h1 class="text-xl font-bold">📷 Barcode Scanner – 2 Cameras</h1>
+      <p class="text-sm opacity-90">Mỗi feed là một camera độc lập, xác nhận theo thời gian/thứ tự frame</p>
+    </div>
+  </header>
+
+  <main class="container mx-auto px-4 py-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Cam 0 -->
+      <div class="bg-white rounded-xl shadow p-3">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold">Camera 0</h2>
+          <span class="text-xs text-gray-500">/barcode_feed/0</span>
+        </div>
+        <img src="/barcode_feed/0" class="w-full rounded-lg border border-gray-300" />
+      </div>
+
+      <!-- Cam 1 -->
+      <div class="bg-white rounded-xl shadow p-3">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold">Camera 1</h2>
+          <span class="text-xs text-gray-500">/barcode_feed/1</span>
+        </div>
+        <img src="/barcode_feed/1" class="w-full rounded-lg border border-gray-300" />
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow p-6 mt-6">
+      <h3 class="text-lg font-semibold mb-3">Ý nghĩa màu sắc</h3>
+      <ul class="space-y-2 text-sm">
+        <li class="flex items-center gap-2"><span class="w-4 h-4 bg-yellow-400 rounded inline-block"></span>Đang đếm</li>
+        <li class="flex items-center gap-2"><span class="w-4 h-4 bg-green-500 rounded inline-block"></span>Vừa xác nhận (✓)</li>
+        <li class="flex items-center gap-2"><span class="w-4 h-4 bg-red-500 rounded inline-block"></span>Đã xác nhận (hiển thị lại)</li>
+      </ul>
+      <p class="text-gray-600 text-sm mt-4">Mẹo: nếu một camera không lên, thử hoán đổi cổng USB, đổi index (0/1/2...), hoặc giảm độ phân giải.</p>
+    </div>
+  </main>
+
+  <footer class="text-center text-sm text-gray-500 py-4 border-t">
+    &copy; 2025 Barcode Scanner Demo – Pyzbar + Flask + Tailwind
+  </footer>
+</body>
+</html>

@@ -12,6 +12,18 @@ def init_db():
     """Tạo bảng nếu chưa có"""
     conn = get_connection()
     c = conn.cursor()
+
+    # Bảng khay (tray)
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS trays (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        x REAL,                        -- tọa độ X
+        y REAL,                        -- tọa độ Y
+        z REAL,                        -- tọa độ Z
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
     c.execute("""
     CREATE TABLE IF NOT EXISTS medicines (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,7 +38,9 @@ def init_db():
     left_pill INTEGER DEFAULT 0,  -- viên lẻ còn lại của vỉ đang bán
     manu_date TEXT,
     exp_date TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    tray_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tray_id) REFERENCES trays(id)
 )
 
     """)
@@ -45,5 +59,6 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
+
     conn.commit()
     conn.close()

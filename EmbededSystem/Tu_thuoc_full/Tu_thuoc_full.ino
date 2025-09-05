@@ -1,4 +1,4 @@
-#include <Servo.h>
+#include <Arduino.h>
 
 // ==== KHAI BÁO CHÂN RELAY ====
 #define RELAY1 3
@@ -8,19 +8,24 @@
 #define RELAYmotor 12
 
 // ==== KHAI BÁO CHÂN CẢM BIẾN HỒNG NGOẠI ====
-#define SENSOR1 6
-#define SENSOR2 7
-#define SENSOR3 8
-#define SENSOR4 9
+#define SENSOR1 7
+#define SENSOR2 6
+#define SENSOR3 9
+#define SENSOR4 8
 
 // ==== KHAI BÁO CẢM BIẾN SIÊU ÂM ====
-const int trigPin = 11;
-const int echoPin = 10;
+const int trigPin = A5;
+const int echoPin = A4;
 
-// ==== SERVO ====
-Servo myServo;
-const int servoPin = A0;
-const int distanceThreshold = 12; // Ngưỡng phát hiện (cm)
+// ==== KHAI BÁO STEPPER ====
+#define STEP_PIN A0   // STEP
+#define DIR_PIN  A1   // DIR
+#define EN_PIN   A2   // ENABLE
+
+const int quarterTurn = 600;   // 90° = 600 step
+const int speedDelay = 1200;   // tốc độ (µs)
+
+const int distanceThreshold = 14; // Ngưỡng phát hiện (cm)
 bool moved = false;               // Cờ tránh lặp liên tục
 
 // ================== SETUP ==================
@@ -32,7 +37,7 @@ void setup() {
   pinMode(RELAY2, OUTPUT);
   pinMode(RELAY3, OUTPUT);
   pinMode(RELAY4, OUTPUT);
-  // pinMode(RELAYmotor,OUTPUT);
+  pinMode(RELAYmotor, OUTPUT);
 
   // Cảm biến hồng ngoại
   pinMode(SENSOR1, INPUT);
@@ -40,22 +45,34 @@ void setup() {
   pinMode(SENSOR3, INPUT);
   pinMode(SENSOR4, INPUT);
 
-  // Servo
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-  myServo.attach(servoPin);
-  myServo.write(0); // Vị trí ban đầu
+  // Stepper
+  pinMode(STEP_PIN, OUTPUT);
+  pinMode(DIR_PIN, OUTPUT);
+  pinMode(EN_PIN, OUTPUT);
+  digitalWrite(EN_PIN, LOW);  // bật driver
 
   // Tắt hết relay ban đầu
   digitalWrite(RELAY1, LOW);
   digitalWrite(RELAY2, LOW);
   digitalWrite(RELAY3, LOW);
   digitalWrite(RELAY4, LOW);
-  // digitalWrite(RELAY1, HIGH);
-  // digitalWrite(RELAY2, HIGH);
-  // digitalWrite(RELAY3, HIGH);
-  // digitalWrite(RELAY4, HIGH);
-  digitalWrite(RELAYmotor, HIGH);
+  digitalWrite(RELAYmotor, LOW);
+
+    // Ultrasonic
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+}
+
+
+// ================== HÀM QUAY STEPPER ==================
+void stepMotor(int steps, int dir, int delayTime) {
+  digitalWrite(DIR_PIN, dir);
+  for (int i = 0; i < steps; i++) {
+    digitalWrite(STEP_PIN, HIGH);
+    delayMicroseconds(delayTime);
+    digitalWrite(STEP_PIN, LOW);
+    delayMicroseconds(delayTime);
+  }
 }
 
 // ================== HÀM ĐỌC CẢM BIẾN HỒNG NGOẠI + ĐIỀU KHIỂN RELAY ==================
@@ -88,58 +105,44 @@ long readUltrasonicDistance() {
 
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
+  digitalWrite(trigPin, LOW); 
 
   long duration = pulseIn(echoPin, HIGH);
   long distance = duration * 0.034 / 2; // cm
   return distance;
 }
 
-// ================== HÀM ĐIỀU KHIỂN SERVO ==================
-void controlServo(long distance) {
- 
+// ================== HÀM ĐIỀU KHIỂN STEPPER ==================
+void controlStepper(long distance) {
   if (!moved && distance > 0 && distance < distanceThreshold) {
-    digitalWrite(RELAYmotor, LOW);
-    Serial.println("bangchuyenstop");
-    // Quay từ 0° -> 90°
+    delay(50);
+    digitalWrite(RELAYmotor, HIGH);
+    Serial.println("Bang chuyen STOP");
 
-    delay(1000);
-    for (int pos = 0; pos <= 90; pos += 2) {
-      myServo.write(pos);
-      delay(50);
-    }
-    delay(500);
+    // Quay 0° -> 90°
+    stepMotor(quarterTurn, HIGH, speedDelay); delay(500);
+    stepMotor(quarterTurn, HIGH, speedDelay); delay(500);
+    // Quay 90° -> 180°
+    stepMotor(quarterTurn, HIGH, speedDelay); delay(500);
+    stepMotor(quarterTurn, HIGH, speedDelay); delay(500);
 
-    // Quay tiếp 90° -> 180°
-    for (int pos = 90; pos <= 180; pos += 2) {
-      myServo.write(pos);
-      delay(50);
-    }
-    delay(500);
+    // Quay 180° -> 90°
+    stepMotor(quarterTurn, LOW, speedDelay); delay(500);
+    stepMotor(quarterTurn, LOW, speedDelay); delay(500);
+    stepMotor(quarterTurn, LOW, speedDelay); delay(500);
+    // Quay 90° -> 0°
+    stepMotor(quarterTurn, LOW, speedDelay); delay(100);
 
-    // Quay ngược từ 180° -> 90°
-    for (int pos = 180; pos >= 90; pos -= 2) {
-      myServo.write(pos);
-      delay(50);
-    }
-    delay(500);
+    stepMotor(quarterTurn*2, HIGH, speedDelay); delay(500);
 
-    // Quay ngược từ 90° -> 0°
-    for (int pos = 90; pos >= 0; pos -= 2) {
-      myServo.write(pos);
-      delay(50);
-    }
-    delay(500);
     moved = true; // Đánh dấu đã quay xong 1 lần
-
   }
 
   // Reset khi vật rời đi
   if (distance >= distanceThreshold) {
     moved = false;
-    digitalWrite(RELAYmotor, HIGH);
-    Serial.println("bangchuyenbat");
-
+    digitalWrite(RELAYmotor, LOW);
+    Serial.println("Bang chuyen BAT");
   }
 }
 
@@ -148,10 +151,10 @@ void loop() {
   // 1. Đọc và xử lý cảm biến hồng ngoại
   readInfraSensors();
 
-  // 2. Đọc cảm biến siêu âm + điều khiển servo
+  // 2. Đọc cảm biến siêu âm + điều khiển stepper
   long distance = readUltrasonicDistance();
   Serial.print("Khoang cach: "); Serial.print(distance); Serial.println(" cm");
-  controlServo(distance);
+  controlStepper(distance);
 
   delay(200);
 }
