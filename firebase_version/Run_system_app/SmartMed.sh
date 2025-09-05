@@ -54,4 +54,4 @@ echo ""
 cd "$APP_DIR"
 
 echo "[*] Starting Flask app on $IP:5000 ..."
-python app.py
+python app_raspi.py
