@@ -70,6 +70,15 @@
                         class="input-field mt-1 block w-full rounded-md border-gray-300 border p-2 focus:outline-none focus:ring focus:ring-blue-200">
                 </div>
                 <div>
+                    <label for="medicineLocation" class="block text-sm font-medium text-gray-700">Tọa độ Thuốc</label>
+                    <select id="medicineLocation" name="medicineLocation" required
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200">
+                        <option value="">Đang tải...</option>
+                    </select>
+                </div>
+
+
+                <div>
                     <label for="manufacturingDate" class="block text-sm font-medium text-gray-700">Ngày Sản Xuất</label>
                     <input type="date" id="manufacturingDate" name="manufacturingDate" required
                         class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
@@ -79,11 +88,11 @@
                     <input type="date" id="expirationDate" name="expirationDate" required
                         class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
                 </div>
-              
-                <button  type="submit"
+
+                <button type="submit"
                     class="btn w-full bg-blue-600 text-white font-semibold py-2 rounded-md hover:bg-blue-700 transition-transform duration-300 hover:-translate-y-0.5">Lưu
                     Thông Tin</button>
-      
+
             </form>
             <div id="result" class="mt-4 text-center text-gray-600"></div>
             <button id="viewListButton"
@@ -165,6 +174,7 @@
                     <input id="editPills" type="number" min="0"
                         class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
                 </div>
+
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Ngày SX</label>
                     <input id="editManu" type="date"
@@ -213,7 +223,7 @@
                 document.getElementById('medicineName').readOnly = true;
                 document.getElementById('medicineType').disabled = true;
                 document.getElementById('stripsPerBox').disabled = true;
-                document.getElementById('pillsPerStrip').disabled = true; 
+                document.getElementById('pillsPerStrip').disabled = true;
                 document.getElementById('medicinePrice').disabled = true;
                 document.getElementById('manufacturingDate').readOnly = true;
                 document.getElementById('expirationDate').readOnly = true;
@@ -241,6 +251,7 @@
                 price: document.getElementById('medicinePrice').value,
                 strips: document.getElementById('stripsPerBox').value,
                 pills: document.getElementById('pillsPerStrip').value,
+                trayid: document.getElementById('medicineLocation').value,
                 manuDate: document.getElementById('manufacturingDate').value,
                 expDate: document.getElementById('expirationDate').value
             };
@@ -309,12 +320,43 @@
             }
         }
 
+        async function loadTrays() {
+            const res = await fetch('/get_trays');
+            const data = await res.json();
+            const trays = data.trays || [];   // lấy mảng trays
+
+            const selectAdd = document.getElementById('medicineLocation');
+            const selectEdit = document.getElementById('editLocation');
+
+            selectAdd.innerHTML = '<option value="">Chọn tọa độ</option>';
+            if (selectEdit) {
+                selectEdit.innerHTML = '<option value="">Chọn tọa độ</option>';
+            }
+
+            trays.forEach(tray => {
+                const text = `X:${tray.x}, Y:${tray.y}, Z:${tray.z}`;
+
+                const opt1 = document.createElement('option');
+                opt1.value = tray.id;
+                opt1.textContent = text;
+                selectAdd.appendChild(opt1);
+
+                if (selectEdit) {
+                    const opt2 = document.createElement('option');
+                    opt2.value = tray.id;
+                    opt2.textContent = text;
+                    selectEdit.appendChild(opt2);
+                }
+            });
+        }
+
+
         document.getElementById('backButton').addEventListener('click', () => {
             document.getElementById('inputSection').classList.remove('hidden');
             document.getElementById('listSection').classList.add('hidden');
         });
 
-        function openEdit(id, name, type, quantity,price, strip, pill, code, manu, exp) {
+        function openEdit(id, name, type, quantity, price, strip, pill, code, manu, exp) {
             if (window.ROLE !== 'admin') {
                 alert('Bạn không có quyền sửa');
                 return;
@@ -324,7 +366,7 @@
             document.getElementById('editType').value = type || '';
             document.getElementById('editCode').value = code || '';
             document.getElementById('editQuantity').value = quantity || 0;
-            document.getElementById('editPrice').value = price || 0; 
+            document.getElementById('editPrice').value = price || 0;
             document.getElementById('editStrips').value = strip || 0;
             document.getElementById('editPills').value = pill || 0;
             document.getElementById('editManu').value = (manu || '').substring(0, 10);
@@ -351,7 +393,7 @@
                 price: document.getElementById('editPrice').value,
                 manuDate: document.getElementById('editManu').value,
                 expDate: document.getElementById('editExp').value
-                
+
             };
             fetch(`/update_medicine/${id}`, {
                 method: "POST",
@@ -368,6 +410,11 @@
                     }
                 });
         });
+
+
+        // gọi khi trang load
+        window.addEventListener("DOMContentLoaded", loadTrays);
+
 
         window.addEventListener("DOMContentLoaded", function () {
             const codeInput = document.getElementById('medicineCode');

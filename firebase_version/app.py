@@ -12,6 +12,8 @@ import numpy as np
 import base64
 from pyzbar.pyzbar import decode
 from database import get_connection, init_db
+from collections import defaultdict
+
 import os
 
 
@@ -218,6 +220,137 @@ def scan_barcode():
     # Redirect về trang nhập thuốc với dữ liệu barcode
     return redirect(url_for("nhapthuoc", barcode=barcode_data))
 
+@app.route("/get_trays", methods=["GET"])
+def get_trays():
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM trays ORDER BY id ASC")
+    rows = c.fetchall()
+    conn.close()
+
+    trays = [dict(row) for row in rows]
+    return {"trays": trays}
+
+
+# --- Tham số xác nhận ---
+REQUIRED_COUNT = 5       # cần đọc 5 lần trong cửa sổ thời gian
+TIME_WINDOW = 0.5        # trong 0.5 giây
+REQUIRED_FRAMES = 3      # hoặc 3 frame liên tiếp
+
+def gen_barcode_frames(cam_index: int):
+    cap = cv2.VideoCapture(cam_index, cv2.CAP_DSHOW)  # Windows: CAP_DSHOW
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
+
+    # Trạng thái cho stream này (mỗi camera độc lập)
+    detected_barcodes = set()
+    count_buffer      = defaultdict(int)
+    start_time        = defaultdict(float)
+    confirmed         = set()
+    frame_seen_count  = defaultdict(int)
+    last_seen_frame   = defaultdict(int)
+    frame_idx = 0
+
+    try:
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            frame_idx += 1
+
+            # Tạo các phiên bản ảnh
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            gray_eq = cv2.equalizeHist(gray)
+            _, thresh = cv2.threshold(
+                gray_eq, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+            )
+
+            # Thử decode trên nhiều phiên bản
+            versions = [("thresh", thresh), ("gray_eq", gray_eq), ("orig", frame)]
+            seen_this_frame = set()
+            results = []
+            for _, img in versions:
+                results = decode(img)
+                if results:
+                    break  # ưu tiên phiên bản đầu tiên decode được
+
+            for bc in results:
+                data = bc.data.decode("utf-8", errors="ignore").strip()
+                if not data or data in seen_this_frame:
+                    continue
+                seen_this_frame.add(data)
+
+                # --- Xử lý logic đếm ---
+                if last_seen_frame[data] == frame_idx - 1:
+                    frame_seen_count[data] += 1
+                else:
+                    frame_seen_count[data] = 1
+                last_seen_frame[data] = frame_idx
+
+                now = time.time()
+                if data not in confirmed:
+                    if count_buffer[data] == 0:
+                        start_time[data] = now
+                        count_buffer[data] = 1
+                    else:
+                        if now - start_time[data] <= TIME_WINDOW:
+                            count_buffer[data] += 1
+                        else:
+                            start_time[data] = now
+                            count_buffer[data] = 1
+
+                    just = (count_buffer[data] >= REQUIRED_COUNT) or \
+                           (frame_seen_count[data] >= REQUIRED_FRAMES)
+                    if just:
+                        confirmed.add(data)
+                        print(f"[CAM {cam_index}] ✅ XÁC NHẬN: {data}")
+                        color = (0, 255, 0)      # xanh lá
+                        label = f"{data} ✓"
+                    else:
+                        color = (0, 255, 255)    # vàng
+                        label = f"{data}"
+                else:
+                    color = (0, 0, 255)          # đỏ
+                    label = f"{data} ✓"
+
+                # --- Vẽ bounding box ---
+                if bc.polygon and len(bc.polygon) >= 4:
+                    pts = [(int(p.x), int(p.y)) for p in bc.polygon]
+                    for i in range(len(pts)):
+                        cv2.line(frame, pts[i], pts[(i + 1) % len(pts)], color, 2)
+                    tx, ty = pts[0]
+                else:
+                    x, y, w, h = bc.rect
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+                    tx, ty = x, y - 10
+
+                cv2.putText(frame, f"[CAM {cam_index}] {label}",
+                            (tx, max(20, ty - 10)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+
+            # Encode JPEG để stream
+            ok, buf = cv2.imencode(".jpg", frame)
+            if not ok:
+                continue
+            jpg = buf.tobytes()
+            yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" +
+                   jpg + b"\r\n")
+    finally:
+        cap.release()
+
+
+@app.route('/barcode_page')
+def barcode_page():
+    return render_template("barcode_page.html")
+
+# Mỗi camera một feed: /barcode_feed/0 và /barcode_feed/1
+@app.route("/barcode_feed/<int:cam_index>")
+def barcode_feed(cam_index: int):
+    return Response(gen_barcode_frames(cam_index),
+                    mimetype="multipart/x-mixed-replace; boundary=frame")
+
+
 @app.route("/nhapthuoc")
 def nhapthuoc():
     barcode = request.args.get('barcode', '')
@@ -257,8 +390,8 @@ def save_medicine():
     else:
         # thêm thuốc mới
         c.execute("""
-            INSERT INTO medicines (name, type, code, quantity,price,strip,pill, manu_date, exp_date)
-            VALUES (?, ?, ?, ?, ?, ?,?,?,?)
+            INSERT INTO medicines (name, type, code, quantity,price,strip,pill, manu_date, exp_date, tray_id)
+            VALUES (?, ?, ?, ?, ?, ?,?,?,?,?)
         """, (
             data.get("name"),
             data.get("type"),
@@ -269,6 +402,7 @@ def save_medicine():
             data.get("pills"),
             data.get("manuDate"),
             data.get("expDate"),
+            data.get("trayid"),
         ))
         conn.commit()
         new_id = c.lastrowid
@@ -592,6 +726,8 @@ def sell():
         as_attachment=True,
         download_name="hoadon.pdf"   # tên file khi tải về
     )
+
+
 
 
 

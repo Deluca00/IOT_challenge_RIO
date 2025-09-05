@@ -2,7 +2,7 @@
 $ErrorActionPreference = "Stop"
 
 # Đường dẫn project
-$APP_DIR = "E:\flask_app_hn\firebase_version\Run_system_app"
+$APP_DIR = "E:\flask_app_hn\firebase_version"
 $CERT_DIR = Join-Path $APP_DIR "certs"
 $KEY_FILE = Join-Path $CERT_DIR "server-key.pem"
 $CRT_FILE = Join-Path $CERT_DIR "server.pem"
