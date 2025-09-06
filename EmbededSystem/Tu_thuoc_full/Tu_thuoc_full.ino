@@ -8,14 +8,14 @@
 #define RELAYmotor 12
 
 // ==== KHAI BÁO CHÂN CẢM BIẾN HỒNG NGOẠI ====
-#define SENSOR1 6
-#define SENSOR2 7
-#define SENSOR3 8
-#define SENSOR4 9
+#define SENSOR1 7
+#define SENSOR2 6
+#define SENSOR3 9
+#define SENSOR4 8
 
 // ==== KHAI BÁO CẢM BIẾN SIÊU ÂM ====
-const int trigPin = 11;
-const int echoPin = 10;
+const int trigPin = A5;
+const int echoPin = A4;
 
 // ==== KHAI BÁO STEPPER ====
 #define STEP_PIN A0   // STEP
@@ -115,7 +115,7 @@ long readUltrasonicDistance() {
 // ================== HÀM ĐIỀU KHIỂN STEPPER ==================
 void controlStepper(long distance) {
   if (!moved && distance > 0 && distance < distanceThreshold) {
-    delay(1000);
+    delay(50);
     digitalWrite(RELAYmotor, HIGH);
     Serial.println("Bang chuyen STOP");
 
@@ -131,7 +131,9 @@ void controlStepper(long distance) {
     stepMotor(quarterTurn, LOW, speedDelay); delay(500);
     stepMotor(quarterTurn, LOW, speedDelay); delay(500);
     // Quay 90° -> 0°
-    stepMotor(quarterTurn, LOW, speedDelay); delay(500);
+    stepMotor(quarterTurn, LOW, speedDelay); delay(100);
+
+    stepMotor(quarterTurn*2, HIGH, speedDelay); delay(500);
 
     moved = true; // Đánh dấu đã quay xong 1 lần
   }
