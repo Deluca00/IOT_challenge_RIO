@@ -7,11 +7,11 @@ def get_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def add_tray(x, y, z):
+def add_tray(name,x, y, z):
     """Thêm 1 khay mới vào database"""
     conn = get_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO trays (x, y, z) VALUES (?, ?, ?)", (x, y, z))
+    c.execute("INSERT INTO trays (name,x, y, z) VALUES (?,?, ?, ?)", (name,x, y, z))
     conn.commit()
     tray_id = c.lastrowid
     conn.close()
@@ -28,11 +28,18 @@ def list_trays():
 
 if __name__ == "__main__":
     # Thêm nhanh vài khay mẫu
-    t1 = add_tray(10.5, 20.2, 5.0)
-    t2 = add_tray(15.0, 25.0, 7.5)
-    t3 = add_tray(5.0, 12.0, 3.5)
+    t1 = add_tray('A1',35,0,30)
+    t2 = add_tray('A2',42,0,185)
+    t3 = add_tray('A3',39,0,267)   
+    t4 = add_tray('A4',43,0,415)   
+    t5 = add_tray('B1',75,0,32)     
+    t6 = add_tray('B2',75,0,185)           
+    t7 = add_tray('B3',76,0,267)
+    t8 = add_tray('B4',76,0,415)
+    t9 = add_tray('C1',62,0,515)
+    t10 = add_tray('C2',0,0,300)
 
-    print("✅ Đã thêm các khay:", t1, t2, t3)
+    print("✅ Đã thêm các khay:", t1, t2, t3, t4, t5, t6, t7, t8, t9, t10)
 
     # In ra danh sách khay
     print("\n=== Danh sách khay hiện có ===")

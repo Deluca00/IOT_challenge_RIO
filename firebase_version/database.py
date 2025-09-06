@@ -17,6 +17,7 @@ def init_db():
     c.execute("""
     CREATE TABLE IF NOT EXISTS trays (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,                       -- tên khay
         x REAL,                        -- tọa độ X
         y REAL,                        -- tọa độ Y
         z REAL,                        -- tọa độ Z

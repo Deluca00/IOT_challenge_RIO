@@ -304,7 +304,23 @@ def gen_barcode_frames(cam_index: int):
                            (frame_seen_count[data] >= REQUIRED_FRAMES)
                     if just:
                         confirmed.add(data)
-                        print(f"[CAM {cam_index}] ✅ XÁC NHẬN: {data}")
+
+                        conn = get_connection()
+                        c = conn.cursor()
+                        c.execute("SELECT tray_id FROM medicines WHERE code = ?", (data,))
+                        row = c.fetchone()
+                        if row:
+                            tray_id = row[0]
+                            c.execute("SELECT x, y, z FROM trays WHERE id = ?", (tray_id,))
+                            tray = c.fetchone()
+                            if tray:
+                                cx, cy, cz = tray
+                            else:
+                                cx = cy = cz = 0
+                        else:
+                            cx = cy = cz = 0
+
+                        print(f"[CAM {cam_index}] ✅ XÁC NHẬN: {data} tại tọa độ từ SQL (x={cx}, y={cy}, z={cz})", flush=True)
                         color = (0, 255, 0)      # xanh lá
                         label = f"{data} ✓"
                     else:
@@ -324,8 +340,9 @@ def gen_barcode_frames(cam_index: int):
                     x, y, w, h = bc.rect
                     cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
                     tx, ty = x, y - 10
+                safe_label = label.encode('ascii', errors='ignore').decode('ascii')
 
-                cv2.putText(frame, f"[CAM {cam_index}] {label}",
+                cv2.putText(frame, f"[CAM {cam_index}] {safe_label}",
                             (tx, max(20, ty - 10)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
 
