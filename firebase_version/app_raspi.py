@@ -15,6 +15,7 @@ from database import get_connection, init_db
 from collections import defaultdict
 
 import os
+os.environ["OPENCV_LOG_LEVEL"] = "SILENT"
 
 
 app = Flask(__name__)
@@ -28,11 +29,10 @@ init_db()
 # - Ví dụ thay bằng rtsp/HTTP: "rtsp://user:pass@192.168.1.10/stream1"
 ###############################################################################
 CAMERA_SOURCES = [
-    {"type": "usb", "index": 0},   # /dev/video0
-    {"type": "usb", "index": 2},   # /dev/video1
-    # {"type": "csi", "index": 0}  # Pi Camera
+    {"type": "usb", "index": 3},   # /dev/video0
+    {"type": "usb", "index": 0},   # /dev/video1
+    # {"type": "usb", "index": 6}  # Pi Camera
 ]
-
 
 # Nếu bạn chỉ có 1-2 webcam, có thể tạm copy nguồn:
 # CAMERA_SOURCES = [0, 0, 0, 0]
@@ -63,6 +63,7 @@ class CameraStream:
         self.cap = cv2.VideoCapture(self.src)
         if not self.cap.isOpened():
             print(f"❌ Không mở được camera: {self.src}")
+
     def start(self):
         if self.running:
             return
@@ -252,6 +253,7 @@ def gen_barcode_frames(cam_index: int):
     stream = streams[cam_index]
     stream.start()
 
+
     # Trạng thái cho stream này (mỗi camera độc lập)
     detected_barcodes = set()
     count_buffer      = defaultdict(int)
@@ -261,96 +263,117 @@ def gen_barcode_frames(cam_index: int):
     last_seen_frame   = defaultdict(int)
     frame_idx = 0
 
-    while True:
-        frame_bytes = stream.get_jpeg()
-        if frame_bytes is None:
-            continue
-
-        frame = cv2.imdecode(np.frombuffer(frame_bytes, np.uint8), cv2.IMREAD_COLOR)
-        frame_idx += 1
-
-        # Tạo các phiên bản ảnh
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray_eq = cv2.equalizeHist(gray)
-        _, thresh = cv2.threshold(
-            gray_eq, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
-        )
-
-        # Thử decode trên nhiều phiên bản
-        versions = [("thresh", thresh), ("gray_eq", gray_eq), ("orig", frame)]
-        seen_this_frame = set()
-        results = []
-        for _, img in versions:
-            results = decode(img)
-            if results:
-                break  # ưu tiên phiên bản đầu tiên decode được
-
-        for bc in results:
-            data = bc.data.decode("utf-8", errors="ignore").strip()
-            if not data or data in seen_this_frame:
+    try:
+        while True:
+            frame_bytes = stream.get_jpeg()
+            if frame_bytes is None:
                 continue
-            seen_this_frame.add(data)
 
-            # --- Xử lý logic đếm ---
-            if last_seen_frame[data] == frame_idx - 1:
-                frame_seen_count[data] += 1
-            else:
-                frame_seen_count[data] = 1
-            last_seen_frame[data] = frame_idx
+            frame = cv2.imdecode(np.frombuffer(frame_bytes, np.uint8), cv2.IMREAD_COLOR)
+            frame_idx += 1
 
-            now = time.time()
-            if data not in confirmed:
-                if count_buffer[data] == 0:
-                    start_time[data] = now
-                    count_buffer[data] = 1
+
+            # Tạo các phiên bản ảnh
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            gray_eq = cv2.equalizeHist(gray)
+            _, thresh = cv2.threshold(
+                gray_eq, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+            )
+
+            # Thử decode trên nhiều phiên bản
+            versions = [("thresh", thresh), ("gray_eq", gray_eq), ("orig", frame)]
+            seen_this_frame = set()
+            results = []
+            for _, img in versions:
+                results = decode(img)
+                if results:
+                    break  # ưu tiên phiên bản đầu tiên decode được
+
+            for bc in results:
+                data = bc.data.decode("utf-8", errors="ignore").strip()
+                if not data or data in seen_this_frame:
+                    continue
+                seen_this_frame.add(data)
+
+                # --- Xử lý logic đếm ---
+                if last_seen_frame[data] == frame_idx - 1:
+                    frame_seen_count[data] += 1
                 else:
-                    if now - start_time[data] <= TIME_WINDOW:
-                        count_buffer[data] += 1
-                    else:
+                    frame_seen_count[data] = 1
+                last_seen_frame[data] = frame_idx
+
+                now = time.time()
+                if data not in confirmed:
+                    if count_buffer[data] == 0:
                         start_time[data] = now
                         count_buffer[data] = 1
+                    else:
+                        if now - start_time[data] <= TIME_WINDOW:
+                            count_buffer[data] += 1
+                        else:
+                            start_time[data] = now
+                            count_buffer[data] = 1
 
-                just = (count_buffer[data] >= REQUIRED_COUNT) or \
-                       (frame_seen_count[data] >= REQUIRED_FRAMES)
-                if just:
-                    confirmed.add(data)
-                    print(f"[CAM {cam_index}] ✅ XÁC NHẬN: {data}")
-                    color = (0, 255, 0)      # xanh lá
-                    label = f"{data} ✓"
+                    just = (count_buffer[data] >= REQUIRED_COUNT) or \
+                           (frame_seen_count[data] >= REQUIRED_FRAMES)
+                    if just:
+                        confirmed.add(data)
+
+                        conn = get_connection()
+                        c = conn.cursor()
+                        c.execute("SELECT tray_id FROM medicines WHERE code = ?", (data,))
+                        row = c.fetchone()
+                        if row:
+                            tray_id = row[0]
+                            c.execute("SELECT x, y, z FROM trays WHERE id = ?", (tray_id,))
+                            tray = c.fetchone()
+                            if tray:
+                                cx, cy, cz = tray
+                            else:
+                                cx = cy = cz = 0
+                        else:
+                            cx = cy = cz = 0
+
+                        print(f"[CAM {cam_index}] ✅ XÁC NHẬN: {data} tại tọa độ từ SQL (x={cx}, y={cy}, z={cz})", flush=True)
+                        color = (0, 255, 0)      # xanh lá
+                        label = f"{data} ✓"
+                    else:
+                        color = (0, 255, 255)    # vàng
+                        label = f"{data}"
                 else:
-                    color = (0, 255, 255)    # vàng
-                    label = f"{data}"
-            else:
-                color = (0, 0, 255)          # đỏ
-                label = f"{data} ✓"
+                    color = (0, 0, 255)          # đỏ
+                    label = f"{data} ✓"
 
-            # --- Vẽ bounding box ---
-            if bc.polygon and len(bc.polygon) >= 4:
-                pts = [(int(p.x), int(p.y)) for p in bc.polygon]
-                for i in range(len(pts)):
-                    cv2.line(frame, pts[i], pts[(i + 1) % len(pts)], color, 2)
-                tx, ty = pts[0]
-            else:
-                x, y, w, h = bc.rect
-                cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-                tx, ty = x, y - 10
+                # --- Vẽ bounding box ---
+                if bc.polygon and len(bc.polygon) >= 4:
+                    pts = [(int(p.x), int(p.y)) for p in bc.polygon]
+                    for i in range(len(pts)):
+                        cv2.line(frame, pts[i], pts[(i + 1) % len(pts)], color, 2)
+                    tx, ty = pts[0]
+                else:
+                    x, y, w, h = bc.rect
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+                    tx, ty = x, y - 10
+                safe_label = label.encode('ascii', errors='ignore').decode('ascii')
 
-            cv2.putText(frame, f"[CAM {cam_index}] {label}",
-                        (tx, max(20, ty - 10)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+                cv2.putText(frame, f"[CAM {cam_index}] {safe_label}",
+                            (tx, max(20, ty - 10)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
 
-        # Encode JPEG để stream
-        ok, buf = cv2.imencode(".jpg", frame)
-        if not ok:
-            continue
-        jpg = buf.tobytes()
-        yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" +
-               jpg + b"\r\n")
+            # Encode JPEG để stream
+            ok, buf = cv2.imencode(".jpg", frame)
+            if not ok:
+                continue
+            jpg = buf.tobytes()
+            yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" +
+                   jpg + b"\r\n")
+    finally:
+        cap.release()
 
 
-@app.route('/barcode_page')
+@app.route('/')
 def barcode_page():
-    return render_template("barcode_page.html")
+    return render_template("index.html")
 
 # Mỗi camera một feed: /barcode_feed/0 và /barcode_feed/1
 @app.route("/barcode_feed/<int:cam_index>")
@@ -791,7 +814,7 @@ if __name__ == "__main__":
     
     app.run( 
         host="0.0.0.0",
-        port=5000,
+        port=5002,
         ssl_context=("server.pem", "server-key.pem"))
     # app.run(host="0.0.0.0", port=5000, debug=True)
 
