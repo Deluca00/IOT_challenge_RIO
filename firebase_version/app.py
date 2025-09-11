@@ -13,7 +13,7 @@ import base64
 from pyzbar.pyzbar import decode
 from database import get_connection, init_db
 from collections import defaultdict
-
+import warnings
 import os
 
 
@@ -237,6 +237,12 @@ REQUIRED_COUNT = 5       # cần đọc 5 lần trong cửa sổ thời gian
 TIME_WINDOW = 0.5        # trong 0.5 giây
 REQUIRED_FRAMES = 3      # hoặc 3 frame liên tiếp
 
+# Chặn cảnh báo từ thư viện zbar
+warnings.filterwarnings("ignore", category=UserWarning, message=".*zbar.*")
+
+# Tiến hành các bước giải mã mã vạch như bình thường
+
+
 def gen_barcode_frames(cam_index: int):
     cap = cv2.VideoCapture(cam_index, cv2.CAP_DSHOW)  # Windows: CAP_DSHOW
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
@@ -357,16 +363,15 @@ def gen_barcode_frames(cam_index: int):
         cap.release()
 
 
-@app.route('/barcode_page')
+@app.route('/')
 def barcode_page():
-    return render_template("barcode_page.html")
+    return render_template("index.html")
 
 # Mỗi camera một feed: /barcode_feed/0 và /barcode_feed/1
 @app.route("/barcode_feed/<int:cam_index>")
 def barcode_feed(cam_index: int):
     return Response(gen_barcode_frames(cam_index),
                     mimetype="multipart/x-mixed-replace; boundary=frame")
-
 
 @app.route("/nhapthuoc")
 def nhapthuoc():
@@ -800,7 +805,7 @@ if __name__ == "__main__":
     
     app.run( 
         host="0.0.0.0",
-        port=5000,
+        port=5001,
         ssl_context=("server.pem", "server-key.pem"))
     # app.run(host="0.0.0.0", port=5000, debug=True)
 
