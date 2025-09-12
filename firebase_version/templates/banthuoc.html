@@ -452,6 +452,8 @@
                 a.remove();
 
                 window.URL.revokeObjectURL(url);
+                window.location.href = "/dashboard";
+                return;
 
                 // Thông báo thành công
                 document.getElementById("result").innerHTML =

@@ -242,8 +242,7 @@ REQUIRED_FRAMES = 3      # hoặc 3 frame liên tiếp
 warnings.filterwarnings("ignore", category=UserWarning, message=".*zbar.*")
 
 # Tiến hành các bước giải mã mã vạch như bình thường
-
-ser = serial.Serial('COM3', 115200, timeout=1)  
+ 
 
 uart_data = None  # Biến toàn cục lưu dữ liệu UART
 
