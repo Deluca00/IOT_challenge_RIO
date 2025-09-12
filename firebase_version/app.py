@@ -243,7 +243,7 @@ warnings.filterwarnings("ignore", category=UserWarning, message=".*zbar.*")
 
 # Tiến hành các bước giải mã mã vạch như bình thường
 
-ser = serial.Serial('COM3', 115200, timeout=1)  
+ 
 
 uart_data = None  # Biến toàn cục lưu dữ liệu UART
 
@@ -737,6 +737,17 @@ def sell():
             med = c.execute("SELECT * FROM medicines WHERE id=?", (medicine_id,)).fetchone()
             if med is None:
                 raise ValueError(f"Không tìm thấy thuốc id={medicine_id}")
+            
+            medid = c.execute("SELECT tray_id FROM medicines WHERE id=?", (medicine_id,)).fetchone()
+            if medid and medid["tray_id"]:
+                tray_id = med["tray_id"]
+                tray = c.execute("SELECT x, y, z FROM trays WHERE id=?", (tray_id,)).fetchone()
+                if tray:
+                    print(f"[LOG] Thuốc ID={medicine_id} tọa độ: x={tray['x']}, y={tray['y']}, z={tray['z']}")
+                else:
+                    print(f"[LOG] Thuốc ID={medicine_id} không có tọa độ trong bảng trays.")
+            else:
+                print(f"[LOG] Thuốc ID={medicine_id} không có tray_id.")
 
             new_quantity, new_left_strip, new_left_pill = process_sale(med, unit, qty)
 
@@ -792,6 +803,7 @@ def sell():
         as_attachment=True,
         download_name="hoadon.pdf"   # tên file khi tải về
     )
+
 
 
 
