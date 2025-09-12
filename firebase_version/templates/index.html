@@ -368,7 +368,7 @@
       document.getElementById('cameraModal').classList.remove('open');
     }
 
-    document.getElementById('cameraMedicalCard').addEventListener('click', openCameraGrid);
+    
 
     const btnNhapThuoc = document.getElementById("btnNhapThuoc");
     const btnbanthuoc = document.getElementById("btnBanthuoc");
@@ -416,6 +416,7 @@
 
     btnNhapThuoc.addEventListener("click", () => {
       cameraDiv.classList.remove("hidden");
+        console.log("Nút thêm thuốc đã được nhấn!");
       startCamera();
     });
 

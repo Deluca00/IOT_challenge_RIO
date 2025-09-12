@@ -16,4 +16,4 @@ DNS.1   = ACHI
 DNS.2   = ACHI.local
 DNS.3   = localhost
 IP.1    = 127.0.0.1
-IP.2    = 192.168.137.254
+IP.2    = 10.1.11.46

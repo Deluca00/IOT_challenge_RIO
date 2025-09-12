@@ -48,11 +48,6 @@
                 </div>
                 <div id="existingInfo" class="hidden bg-gray-100 p-3 rounded-md text-sm text-gray-700 mb-2"></div>
                 <div>
-                    <label for="medicineQuantity" class="block text-sm font-medium text-gray-700">Số lượng</label>
-                    <input type="number" id="medicineQuantity" name="medicineQuantity" required min="0"
-                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
-                </div>
-                <div>
                     <label for="medicinePrice" class="block text-sm font-medium text-gray-700">Giá (VND)</label>
                     <input type="number" id="medicinePrice" name="medicinePrice" required min="0" step="0.01"
                         class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
@@ -153,7 +148,7 @@
                     <input id="editCode"
                         class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
                 </div>
-                <div>
+                <div class="hidden">
                     <label class="block text-sm font-medium text-gray-700">Số lượng</label>
                     <input id="editQuantity" type="number" min="0"
                         class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200 transition-shadow duration-300">
@@ -205,8 +200,10 @@
             const res = await fetch(`/get_medicine/${code}`);
             const data = await res.json();
             const infoBox = document.getElementById('existingInfo');
+            const quantityDiv = document.getElementById('quantityDiv');
 
             if (data.exists) {
+                quantityDiv.style.display = 'none';
                 const med = data.medicine;
                 infoBox.classList.remove('hidden');
                 infoBox.innerHTML = `
@@ -228,6 +225,7 @@
                 document.getElementById('manufacturingDate').readOnly = true;
                 document.getElementById('expirationDate').readOnly = true;
             } else {
+                quantityDiv.style.display = '';
                 infoBox.classList.add('hidden');
                 document.getElementById('medicineName').readOnly = false;
                 document.getElementById('medicineType').disabled = false;
@@ -247,7 +245,6 @@
                 name: document.getElementById('medicineName').value,
                 type: document.getElementById('medicineType').value,
                 code: document.getElementById('medicineCode').value,
-                quantity: document.getElementById('medicineQuantity').value,
                 price: document.getElementById('medicinePrice').value,
                 strips: document.getElementById('stripsPerBox').value,
                 pills: document.getElementById('pillsPerStrip').value,
