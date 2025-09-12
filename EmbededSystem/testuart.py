@@ -1,6 +1,6 @@
 import serial
 
-ser = serial.Serial('Com3', 115200, timeout=1)
+ser = serial.Serial('Com5', 115200, timeout=1)
 
 print("🔌 Đang đọc dữ liệu từ /dev/ttyUSB0 ... (Ctrl+C để thoát)")
 
