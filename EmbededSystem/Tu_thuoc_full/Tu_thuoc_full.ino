@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <SoftwareSerial.h>
 
 // ==== KHAI BÁO CHÂN RELAY ====
 #define RELAY1 3
@@ -25,12 +26,18 @@ const int echoPin = A4;
 const int quarterTurn = 600;   // 90° = 600 step
 const int speedDelay = 1200;   // tốc độ (µs)
 
-const int distanceThreshold = 14; // Ngưỡng phát hiện (cm)
+const int distanceThreshold = 13; // Ngưỡng phát hiện (cm)
 bool moved = false;               // Cờ tránh lặp liên tục
+
+
+
+SoftwareSerial espSerial(10, 11); // RX=10, TX=11
+
 
 // ================== SETUP ==================
 void setup() {
   Serial.begin(9600);
+  espSerial.begin(9600); 
 
   // Relay
   pinMode(RELAY1, OUTPUT);
@@ -58,11 +65,10 @@ void setup() {
   digitalWrite(RELAY4, LOW);
   digitalWrite(RELAYmotor, LOW);
 
-    // Ultrasonic
+  // Ultrasonic
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
 }
-
 
 // ================== HÀM QUAY STEPPER ==================
 void stepMotor(int steps, int dir, int delayTime) {
@@ -117,32 +123,29 @@ void controlStepper(long distance) {
   if (!moved && distance > 0 && distance < distanceThreshold) {
     delay(50);
     digitalWrite(RELAYmotor, HIGH);
-    Serial.println("Bang chuyen STOP");
+    Serial.println("Bang chuyen STOP"); 
 
-    // Quay 0° -> 90°
+    // Quay 0° -> 180°
     stepMotor(quarterTurn, HIGH, speedDelay); delay(500);
     stepMotor(quarterTurn, HIGH, speedDelay); delay(500);
-    // Quay 90° -> 180°
-    stepMotor(quarterTurn, HIGH, speedDelay); delay(500);
-    stepMotor(quarterTurn, HIGH, speedDelay); delay(500);
-
-    // Quay 180° -> 90°
     stepMotor(quarterTurn, LOW, speedDelay); delay(500);
     stepMotor(quarterTurn, LOW, speedDelay); delay(500);
-    stepMotor(quarterTurn, LOW, speedDelay); delay(500);
-    // Quay 90° -> 0°
-    stepMotor(quarterTurn, LOW, speedDelay); delay(100);
 
+    // Quay về 0°
     stepMotor(quarterTurn*2, HIGH, speedDelay); delay(500);
+
+    Serial.println("TAKE");   // Gửi lệnh STOP sang ESP32
+    espSerial.println("TAKE"); 
 
     moved = true; // Đánh dấu đã quay xong 1 lần
   }
 
   // Reset khi vật rời đi
-  if (distance >= distanceThreshold) {
+  if (distance >= 13) {
     moved = false;
     digitalWrite(RELAYmotor, LOW);
     Serial.println("Bang chuyen BAT");
+     // Gửi lệnh RUN sang ESP32
   }
 }
 

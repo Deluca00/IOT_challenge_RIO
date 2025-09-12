@@ -13,8 +13,9 @@ import base64
 from pyzbar.pyzbar import decode
 from database import get_connection, init_db
 from collections import defaultdict
-
+import warnings
 import os
+import serial
 os.environ["OPENCV_LOG_LEVEL"] = "SILENT"
 
 
@@ -334,6 +335,15 @@ def gen_barcode_frames(cam_index: int):
                         else:
                             cx = cy = cz = 0
 
+                        # UART action when barcode is confirmed and coordinates are known
+                        try:
+                            if uart_data == "binhthuong":
+                                send_uart_signal("mode import", (cx, cy, cz))
+                            elif uart_data == "hong":
+                                send_uart_signal("mode hong")
+                        except Exception as _e:
+                            print(f"[UART OUT] Skip send: {_e}", flush=True)
+
                         print(f"[CAM {cam_index}] ✅ XÁC NHẬN: {data} tại tọa độ từ SQL (x={cx}, y={cy}, z={cz})", flush=True)
                         color = (0, 255, 0)      # xanh lá
                         label = f"{data} ✓"
@@ -367,8 +377,110 @@ def gen_barcode_frames(cam_index: int):
             jpg = buf.tobytes()
             yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" +
                    jpg + b"\r\n")
-    finally:
-        cap.release()
+
+    except Exception as e:
+        print(f"[BARCODE] Stream error: {e}", flush=True)
+
+
+# --- Tham so xac nhan ---
+REQUIRED_COUNT = 5       # can doc 5 lan trong cua so thoi gian
+TIME_WINDOW = 0.5        # trong 0.5 giay
+REQUIRED_FRAMES = 3      # hoac 3 frame lien tiep
+
+# Chan canh bao tu thu vien zbar
+warnings.filterwarnings("ignore", category=UserWarning, message=".*zbar.*")
+
+
+# ================== UART (Raspberry Pi) ==================
+# Lắng nghe UART và gửi tín hiệu ra UART
+
+def _first_existing(paths):
+    for p in paths:
+        try:
+            if os.path.exists(p):
+                return p
+        except Exception:
+            pass
+    return None
+
+def get_default_serial_in():
+    env = os.getenv("SERIAL_PORT_IN")
+    if env:
+        return env
+    return _first_existing([
+        "/dev/serial0",
+        "/dev/ttyAMA0",
+        "/dev/ttyS0",
+        "/dev/ttyUSB0",
+        "/dev/ttyACM0",
+    ])
+
+def get_default_serial_out():
+    env = os.getenv("SERIAL_PORT_OUT")
+    if env:
+        return env
+    return _first_existing([
+        "/dev/serial0",
+        "/dev/ttyUSB1",
+        "/dev/ttyACM1",
+        "/dev/ttyAMA0",
+        "/dev/ttyS0",
+    ])
+
+UART_BAUD = int(os.getenv("SERIAL_BAUD", "115200"))
+UART_IN_PORT = get_default_serial_in()
+UART_OUT_PORT = get_default_serial_out() or UART_IN_PORT
+
+print(f"[UART] IN={UART_IN_PORT} OUT={UART_OUT_PORT} BAUD={UART_BAUD}", flush=True)
+
+uart_data = None  # Biến toàn cục lưu dữ liệu UART
+
+def uart_listener():
+    global uart_data
+    if not UART_IN_PORT:
+        print("[UART IN] No input serial port found.", flush=True)
+        return
+    try:
+        with serial.Serial(UART_IN_PORT, UART_BAUD, timeout=1) as uart_in:
+            print(f"[UART IN] Listening on {UART_IN_PORT}...", flush=True)
+            while True:
+                try:
+                    if uart_in.in_waiting:
+                        data = uart_in.readline().decode(errors="ignore").strip()
+                        if data:
+                            print(f"[UART IN] Received: {data}", flush=True)
+                            uart_data = data
+                    else:
+                        time.sleep(0.01)
+                except Exception as e:
+                    print(f"[UART IN] Read error: {e}", flush=True)
+                    time.sleep(0.5)
+    except Exception as e:
+        print(f"[UART IN] Open error on {UART_IN_PORT}: {e}", flush=True)
+
+# Khởi động thread UART listener
+threading.Thread(target=uart_listener, daemon=True).start()
+
+def send_uart_signal(signal, coords=None):
+    port = UART_OUT_PORT
+    if not port:
+        print("[UART OUT] No output serial port found.", flush=True)
+        return
+    try:
+        with serial.Serial(port, UART_BAUD, timeout=1) as ser_out:
+            if signal == "mode import" and coords is not None:
+                msg = f"mode import x={coords[0]}, y={coords[1]}, z={coords[2]}\n"
+            elif signal == "mode hong":
+                msg = "mode hong\n"
+            else:
+                msg = f"{signal}\n"
+            ser_out.write(msg.encode())
+            ser_out.flush()
+            print(f"[UART OUT] {port} <- {msg.strip()}", flush=True)
+    except Exception as e:
+        print(f"[UART OUT] Error on {port}: {e}", flush=True)
+
+    
 
 
 @app.route('/')

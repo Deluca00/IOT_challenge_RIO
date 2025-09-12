@@ -13,8 +13,9 @@ import base64
 from pyzbar.pyzbar import decode
 from database import get_connection, init_db
 from collections import defaultdict
-
+import warnings
 import os
+import serial
 
 
 app = Flask(__name__)
@@ -28,8 +29,8 @@ init_db()
 # - Ví dụ thay bằng rtsp/HTTP: "rtsp://user:pass@192.168.1.10/stream1"
 ###############################################################################
 CAMERA_SOURCES = [
-    1,  # Camera 1
-    0,  # Camera 2
+    0,  # Camera 1
+    1,  # Camera 2
     2,  # Camera 3
     3   # Camera 4
 ]
@@ -237,6 +238,45 @@ REQUIRED_COUNT = 5       # cần đọc 5 lần trong cửa sổ thời gian
 TIME_WINDOW = 0.5        # trong 0.5 giây
 REQUIRED_FRAMES = 3      # hoặc 3 frame liên tiếp
 
+# Chặn cảnh báo từ thư viện zbar
+warnings.filterwarnings("ignore", category=UserWarning, message=".*zbar.*")
+
+# Tiến hành các bước giải mã mã vạch như bình thường
+
+ser = serial.Serial('COM3', 115200, timeout=1)  
+
+uart_data = None  # Biến toàn cục lưu dữ liệu UART
+
+# Thread lắng nghe UART từ vi điều khiển khác (ví dụ COM4)
+def uart_listener():
+    global uart_data
+    uart_in = serial.Serial('COM12', 115200, timeout=1)  # Đổi COM4 thành cổng bạn dùng
+    while True:
+        if uart_in.in_waiting:
+            data = uart_in.readline().decode().strip()
+            print(f"[UART IN] Nhận: {data}")
+            uart_data = data  # Lưu giá trị nhận được
+
+
+# Khởi động thread UART listener khi chạy app
+import threading
+threading.Thread(target=uart_listener, daemon=True).start()
+
+def send_uart_signal_to_com5(signal, coords=None):
+    try:
+        ser_com5 = serial.Serial('COM11', 115200, timeout=1)
+        if signal == "mode import" and coords:
+            msg = f"mode import x={coords[0]}, y={coords[1]}, z={coords[2]}\n"
+        elif signal == "mode hong":
+            msg = "mode hong\n"
+        else:
+            msg = f"{signal}\n"
+        ser_com5.write(msg.encode())
+        ser_com5.close()
+        print(f"[UART OUT COM5] Sent: {msg.strip()}")
+    except Exception as e:
+        print(f"[UART OUT COM5] Error: {e}")
+
 def gen_barcode_frames(cam_index: int):
     cap = cv2.VideoCapture(cam_index, cv2.CAP_DSHOW)  # Windows: CAP_DSHOW
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
@@ -321,6 +361,13 @@ def gen_barcode_frames(cam_index: int):
                             cx = cy = cz = 0
 
                         print(f"[CAM {cam_index}] ✅ XÁC NHẬN: {data} tại tọa độ từ SQL (x={cx}, y={cy}, z={cz})", flush=True)
+
+                        if uart_data == "binhthuong":
+                            send_uart_signal_to_com5("mode import", (cx, cy, cz))
+                        elif uart_data == "hong":
+                            send_uart_signal_to_com5("mode hong")
+                        # Các giá trị khác sẽ không gửi gì
+
                         color = (0, 255, 0)      # xanh lá
                         label = f"{data} ✓"
                     else:
@@ -357,16 +404,15 @@ def gen_barcode_frames(cam_index: int):
         cap.release()
 
 
-@app.route('/barcode_page')
+@app.route('/')
 def barcode_page():
-    return render_template("barcode_page.html")
+    return render_template("index.html")
 
 # Mỗi camera một feed: /barcode_feed/0 và /barcode_feed/1
 @app.route("/barcode_feed/<int:cam_index>")
 def barcode_feed(cam_index: int):
     return Response(gen_barcode_frames(cam_index),
                     mimetype="multipart/x-mixed-replace; boundary=frame")
-
 
 @app.route("/nhapthuoc")
 def nhapthuoc():
@@ -388,6 +434,9 @@ def get_medicine(code):
 @app.route("/save_medicine", methods=["POST"])
 def save_medicine():
     data = request.get_json()
+
+    print("DEBUG DATA:", data)  # Thêm dòng này
+    ...
     conn = get_connection()
     c = conn.cursor()
 
@@ -413,7 +462,7 @@ def save_medicine():
             data.get("name"),
             data.get("type"),
             data.get("code"),
-            data.get("quantity"),
+            "0",  
             data.get("price"),
             data.get("strips"),
             data.get("pills"),
@@ -800,7 +849,7 @@ if __name__ == "__main__":
     
     app.run( 
         host="0.0.0.0",
-        port=5000,
+        port=5001,
         ssl_context=("server.pem", "server-key.pem"))
     # app.run(host="0.0.0.0", port=5000, debug=True)
 
