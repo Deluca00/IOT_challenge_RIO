@@ -13,9 +13,9 @@ import base64
 from pyzbar.pyzbar import decode
 from database import get_connection, init_db
 from collections import defaultdict
-
+import warnings
 import os
-os.environ["OPENCV_LOG_LEVEL"] = "SILENT"
+import serial
 
 
 app = Flask(__name__)
@@ -29,8 +29,8 @@ init_db()
 # - Ví dụ thay bằng rtsp/HTTP: "rtsp://user:pass@192.168.1.10/stream1"
 ###############################################################################
 CAMERA_SOURCES = [
-    {"type": "usb", "index": 3},   # /dev/video0
-    {"type": "usb", "index": 0},   # /dev/video1
+    {"type": "usb", "index": 0},   # /dev/video0
+    {"type": "usb", "index": 2},   # /dev/video1
     # {"type": "usb", "index": 6}  # Pi Camera
 ]
 
@@ -41,29 +41,28 @@ CAMERA_SOURCES = [
 # LỚP QUẢN LÝ CAMERA: mở cv2.VideoCapture và chạy thread đọc khung hình
 ###############################################################################
 class CameraStream:
-    def __init__(self, source, cam_name="Camera"):
+    def __init__(self, src, cam_name="cam"):
         self.cam_name = cam_name
         self.running = False
         self.frame = None
         self.lock = threading.Lock()
 
-        if isinstance(source, dict):
-            if source["type"] == "usb":
-                self.src = int(source["index"])
-            elif source["type"] == "csi":
-                self.src = int(source["index"])
-            elif source["type"] == "ip":
-                self.src = source["url"]
+        if isinstance(src, dict):
+            if src["type"] == "usb":
+                self.src = int(src["index"])
+            elif src["type"] == "csi":
+                self.src = int(src["index"])
+            elif src["type"] == "ip":
+                self.src = src["url"]
             else:
                 raise ValueError("❌ Unknown camera type")
         else:
-            self.src = source
+            self.src = src
 
         # mở camera
         self.cap = cv2.VideoCapture(self.src)
         if not self.cap.isOpened():
             print(f"❌ Không mở được camera: {self.src}")
-
     def start(self):
         if self.running:
             return
@@ -246,6 +245,62 @@ REQUIRED_COUNT = 5       # cần đọc 5 lần trong cửa sổ thời gian
 TIME_WINDOW = 0.5        # trong 0.5 giây
 REQUIRED_FRAMES = 3      # hoặc 3 frame liên tiếp
 
+# Chặn cảnh báo từ thư viện zbar
+warnings.filterwarnings("ignore", category=UserWarning, message=".*zbar.*")
+
+# Tiến hành các bước giải mã mã vạch như bình thường
+ 
+
+uart_data = None  # Biến toàn cục lưu dữ liệu UART
+
+ser_usb0 = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
+ser_acm0 = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
+
+def uart_listener():
+    global uart_data
+    uart_in = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)  # Đổi COM4 thành cổng bạn dùng
+    while True:
+        if uart_in.in_waiting:
+            data = uart_in.readline().decode().strip()
+            print(f"[UART IN] Nhận: {data}")
+            uart_data = data  # Lưu giá trị nhận được
+
+threading.Thread(target=uart_listener, daemon=True).start()
+
+def send_uart_signal(signal, coords):
+    global ser_acm0
+    signal = signal.lower()
+
+    if signal == "mode import" and coords:
+        ser_acm0.write(b"MODE IMPORT\r\n")
+        msg = f"X{coords[0]}Y{coords[1]}Z{coords[2]}\r\n"
+        ser_acm0.write(msg.encode())
+        print(f"[UART OUT] MODE IMPORT + {msg.strip()}")
+
+    elif signal == "mode hong":
+        ser_acm0.write(b"MODE HONG\r\n")
+        print("[UART OUT] MODE HONG")
+
+    elif signal == "mode export" and coords:
+        ser_acm0.write(b"MODE EXPORT\r\n")
+        msg = f"X{coords[0]}Y{coords[1]}Z{coords[2]}\r\n"
+        ser_acm0.write(msg.encode())
+        print(f"[UART OUT] MODE EXPORT + {msg.strip()}")
+    else:
+        msg = f"{signal}\r\n"
+        ser_acm0.write(msg.encode())
+        print(f"[UART OUT] {msg.strip()}")
+
+    
+# ==== API ====
+@app.route("/send", methods=["POST"])
+def send():
+    data = request.json           # Lấy JSON body từ request
+    signal = data.get("signal")   # Ví dụ: "mode import"
+    coords = data.get("coords")   # Ví dụ: [30, 0, 0]
+    send_uart_signal(signal, coords)  # Gửi ra UART
+    return jsonify({"status": "sent", "signal": signal})
+  
 def gen_barcode_frames(cam_index: int):
     if cam_index < 0 or cam_index >= len(streams):
         return
@@ -265,13 +320,10 @@ def gen_barcode_frames(cam_index: int):
 
     try:
         while True:
-            frame_bytes = stream.get_jpeg()
-            if frame_bytes is None:
-                continue
-
-            frame = cv2.imdecode(np.frombuffer(frame_bytes, np.uint8), cv2.IMREAD_COLOR)
+            ok, frame = stream.cap.read()   # ✅ sửa từ cap -> stream.cap
+            if not ok:
+                break
             frame_idx += 1
-
 
             # Tạo các phiên bản ảnh
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -335,6 +387,17 @@ def gen_barcode_frames(cam_index: int):
                             cx = cy = cz = 0
 
                         print(f"[CAM {cam_index}] ✅ XÁC NHẬN: {data} tại tọa độ từ SQL (x={cx}, y={cy}, z={cz})", flush=True)
+
+                        if uart_data == "binhthuong":
+                            send_uart_signal("mode import", (cx, cy, cz))
+                            print("kkkk")
+                            print(f"uart_data: {uart_data}")
+                        elif uart_data == "hong":
+                            send_uart_signal("mode hong", (0, 0, 0))
+                            print("lll")
+                            print(f"uart_data: {uart_data}")
+                        # Các giá trị khác sẽ không gửi gì
+
                         color = (0, 255, 0)      # xanh lá
                         label = f"{data} ✓"
                     else:
@@ -368,7 +431,7 @@ def gen_barcode_frames(cam_index: int):
             yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" +
                    jpg + b"\r\n")
     finally:
-        cap.release()
+        stream.cap.release()
 
 
 @app.route('/')
@@ -380,7 +443,6 @@ def barcode_page():
 def barcode_feed(cam_index: int):
     return Response(gen_barcode_frames(cam_index),
                     mimetype="multipart/x-mixed-replace; boundary=frame")
-
 
 @app.route("/nhapthuoc")
 def nhapthuoc():
@@ -402,6 +464,9 @@ def get_medicine(code):
 @app.route("/save_medicine", methods=["POST"])
 def save_medicine():
     data = request.get_json()
+
+    print("DEBUG DATA:", data)  # Thêm dòng này
+    ...
     conn = get_connection()
     c = conn.cursor()
 
@@ -427,7 +492,7 @@ def save_medicine():
             data.get("name"),
             data.get("type"),
             data.get("code"),
-            data.get("quantity"),
+            "0",  
             data.get("price"),
             data.get("strips"),
             data.get("pills"),
@@ -702,6 +767,21 @@ def sell():
             med = c.execute("SELECT * FROM medicines WHERE id=?", (medicine_id,)).fetchone()
             if med is None:
                 raise ValueError(f"Không tìm thấy thuốc id={medicine_id}")
+            
+            medid = c.execute("SELECT tray_id FROM medicines WHERE id=?", (medicine_id,)).fetchone()
+            if medid and medid["tray_id"]:
+                tray_id = med["tray_id"]
+                tray = c.execute("SELECT x, y, z FROM trays WHERE id=?", (tray_id,)).fetchone()
+                if tray:
+                    print(f"[LOG] Thuốc ID={medicine_id} tọa độ: x={tray['x']}, y={tray['y']}, z={tray['z']}")
+                    send_uart_signal("mode export", (tray['x'], tray['y'], tray['z']))
+                    print("kkkk")
+
+                    
+                else:
+                    print(f"[LOG] Thuốc ID={medicine_id} không có tọa độ trong bảng trays.")
+            else:
+                print(f"[LOG] Thuốc ID={medicine_id} không có tray_id.")
 
             new_quantity, new_left_strip, new_left_pill = process_sale(med, unit, qty)
 
@@ -814,7 +894,7 @@ if __name__ == "__main__":
     
     app.run( 
         host="0.0.0.0",
-        port=5002,
+        port=5000,
         ssl_context=("server.pem", "server-key.pem"))
     # app.run(host="0.0.0.0", port=5000, debug=True)
 

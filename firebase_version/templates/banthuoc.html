@@ -451,11 +451,9 @@
                 a.click();
                 a.remove();
 
+                
                 window.URL.revokeObjectURL(url);
 
-                // Thông báo thành công
-                document.getElementById("result").innerHTML =
-                    `✅ Bán thành công! Hóa đơn đã được tải về.`;
 
             } catch (err) {
                 console.error(err);
