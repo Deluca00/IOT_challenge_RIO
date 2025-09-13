@@ -128,6 +128,11 @@ void controlStepper(long distance) {
     // Quay 0° -> 180°
     stepMotor(quarterTurn, HIGH, speedDelay); delay(500);
     stepMotor(quarterTurn, HIGH, speedDelay); delay(500);
+    stepMotor(quarterTurn, HIGH, speedDelay); delay(500);
+    stepMotor(quarterTurn, HIGH, speedDelay); delay(500);
+
+    stepMotor(quarterTurn, LOW, speedDelay); delay(500);
+    stepMotor(quarterTurn, LOW, speedDelay); delay(500);
     stepMotor(quarterTurn, LOW, speedDelay); delay(500);
     stepMotor(quarterTurn, LOW, speedDelay); delay(500);
 
@@ -141,7 +146,7 @@ void controlStepper(long distance) {
   }
 
   // Reset khi vật rời đi
-  if (distance >= 13) {
+  if (distance >= 15) {
     moved = false;
     digitalWrite(RELAYmotor, LOW);
     Serial.println("Bang chuyen BAT");
