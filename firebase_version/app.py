@@ -243,7 +243,7 @@ warnings.filterwarnings("ignore", category=UserWarning, message=".*zbar.*")
 
 # Tiến hành các bước giải mã mã vạch như bình thường
 
- 
+ser = serial.Serial('COM3', 115200, timeout=1)  
 
 uart_data = None  # Biến toàn cục lưu dữ liệu UART
 
@@ -264,7 +264,7 @@ threading.Thread(target=uart_listener, daemon=True).start()
 
 def send_uart_signal_to_com5(signal, coords=None):
     try:
-        ser_com5 = serial.Serial('COM11', 115200, timeout=1)
+        ser_com5 = serial.Serial('COM5', 115200, timeout=1)
         if signal == "mode import" and coords:
             msg = f"mode import x={coords[0]}, y={coords[1]}, z={coords[2]}\n"
         elif signal == "mode hong":
