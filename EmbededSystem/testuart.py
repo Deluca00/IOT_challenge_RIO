@@ -1,4 +1,5 @@
-import serial, time
+import serial
+import time
 
 PORT = "/dev/ttyACM0"
 BAUD = 115200
@@ -8,16 +9,23 @@ time.sleep(2)  # đợi Arduino reset khi mở cổng
 
 print(f"🔌 Đang đọc dữ liệu từ {PORT} ... (Ctrl+C để thoát)")
 
-# Gửi lệnh test
-ser.write(b"MODE IMPORT\r\n")
-ser.write(b"X30Y0Z0\r\n")
-# ser.write(b"mode import x30y0z0")
-
 try:
     while True:
-        line = ser.readline().decode(errors="ignore").strip()
-        if line:
-            print(f"[RX] {line}")
+        # Đọc dữ liệu từ Arduino
+        if ser.in_waiting:
+            line = ser.readline().decode(errors="ignore").strip()
+            if line:
+                print(f"[RX] {line}")
+
+        # Nhập bất cứ gì muốn gửi
+        msg = input("Nhập tin nhắn gửi Arduino (hoặc 'exit' để thoát): ")
+        if msg.lower() == 'exit':
+            break
+
+        # Gửi trực tiếp
+        ser.write((msg + "\r\n").encode())
+        print(f"[TX] {msg}")
+
 except KeyboardInterrupt:
     print("\n⏹ Dừng lại.")
 finally:

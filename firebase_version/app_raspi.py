@@ -254,7 +254,7 @@ warnings.filterwarnings("ignore", category=UserWarning, message=".*zbar.*")
 uart_data = None  # Biến toàn cục lưu dữ liệu UART
 
 ser_usb0 = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
-ser_acm0 = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
+# ser_acm0 = serial.Serial('/dev/ttyACM1', 115200, timeout=1)
 
 def uart_listener():
     global uart_data
@@ -267,29 +267,31 @@ def uart_listener():
 
 threading.Thread(target=uart_listener, daemon=True).start()
 
-def send_uart_signal(signal, coords):
-    global ser_acm0
-    signal = signal.lower()
+# def send_uart_signal(signal, coords):
+#     global ser_acm0
+#     signal = signal.lower()
 
-    if signal == "mode import" and coords:
-        ser_acm0.write(b"MODE IMPORT\r\n")
-        msg = f"X{coords[0]}Y{coords[1]}Z{coords[2]}\r\n"
-        ser_acm0.write(msg.encode())
-        print(f"[UART OUT] MODE IMPORT + {msg.strip()}")
+#     if signal == "mode import" and coords:
+#         ser_acm0.write(b"MODE IMPORT\r\n")
+#         msg = f"X{coords[0]}Y{coords[1]}Z{coords[2]}\r\n"
+#         ser_acm0.write(msg.encode())
+#         print(f"[UART OUT] MODE IMPORT + {msg.strip()}")
 
-    elif signal == "mode hong":
-        ser_acm0.write(b"MODE HONG\r\n")
-        print("[UART OUT] MODE HONG")
+#     elif signal == "mode hong":
+#         ser_acm0.write(b"MODE HONG\r\n")
+#         print("[UART OUT] MODE HONG")
 
-    elif signal == "mode export" and coords:
-        ser_acm0.write(b"MODE EXPORT\r\n")
-        msg = f"X{coords[0]}Y{coords[1]}Z{coords[2]}\r\n"
-        ser_acm0.write(msg.encode())
-        print(f"[UART OUT] MODE EXPORT + {msg.strip()}")
-    else:
-        msg = f"{signal}\r\n"
-        ser_acm0.write(msg.encode())
-        print(f"[UART OUT] {msg.strip()}")
+#     elif signal == "mode export" and coords:
+#         ser_acm0.write(b"MODE EXPORT\r\n")
+#         msg = f"X{coords[0]}Y{coords[1]}Z{coords[2]}\r\n"
+#         ser_acm0.write(msg.encode())
+#         print(f"[UART OUT] MODE EXPORT + {msg.strip()}")
+#     else:
+#         msg = f"{signal}\r\n"
+#         ser_acm0.write(msg.encode())
+#         print(f"[UART OUT] {msg.strip()}") 
+
+
 
     
 # ==== API ====
@@ -388,14 +390,14 @@ def gen_barcode_frames(cam_index: int):
 
                         print(f"[CAM {cam_index}] ✅ XÁC NHẬN: {data} tại tọa độ từ SQL (x={cx}, y={cy}, z={cz})", flush=True)
 
-                        if uart_data == "binhthuong":
-                            send_uart_signal("mode import", (cx, cy, cz))
-                            print("kkkk")
-                            print(f"uart_data: {uart_data}")
-                        elif uart_data == "hong":
-                            send_uart_signal("mode hong", (0, 0, 0))
-                            print("lll")
-                            print(f"uart_data: {uart_data}")
+                        # if uart_data == "binhthuong":
+                            # send_uart_signal("mode import", (cx, cy, cz))
+                            # print("kkkk")
+                            # print(f"uart_data: {uart_data}")
+                        # elif uart_data == "hong":
+                            # send_uart_signal("mode hong", (0, 0, 0))
+                            # print("lll")
+                            # print(f"uart_data: {uart_data}")
                         # Các giá trị khác sẽ không gửi gì
 
                         color = (0, 255, 0)      # xanh lá
@@ -774,15 +776,23 @@ def sell():
                 tray = c.execute("SELECT x, y, z FROM trays WHERE id=?", (tray_id,)).fetchone()
                 if tray:
                     print(f"[LOG] Thuốc ID={medicine_id} tọa độ: x={tray['x']}, y={tray['y']}, z={tray['z']}")
-                    send_uart_signal("mode export", (tray['x'], tray['y'], tray['z']))
-                    print("kkkk")
+                    # send_uart_signal("mode export", (tray['x'], tray['y'], tray['z']))
+                    # print("kkkk")
 
                     
                 else:
                     print(f"[LOG] Thuốc ID={medicine_id} không có tọa độ trong bảng trays.")
             else:
                 print(f"[LOG] Thuốc ID={medicine_id} không có tray_id.")
+                
 
+                next_tray = c.execute("SELECT x, y, z FROM trays WHERE id=?",(medicine_id+1,)).fetchone()
+                if next_tray:
+                    print(f"[LOG] Thuốc ID={medicine_id+1} tọa độ: x={next_tray['x']}, y={next_tray['y']}, z={next_tray['z']}")
+                    send_uart_signal("mode export", (next_tray['x'], next_tray['y'], next_tray['z']))
+                else:
+                    print(f"[LOG] Thuốc ID={medicine_id+1} không có tọa độ trong bảng trays.")
+   
             new_quantity, new_left_strip, new_left_pill = process_sale(med, unit, qty)
 
             # Tính giá
@@ -835,7 +845,7 @@ def sell():
         rpdf_buffer,
         mimetype="application/pdf",
         as_attachment=True,
-        download_name="hoadon.pdf"   # tên file khi tải về
+        attachment_filename="report.pdf"   # tên file khi tải về
     )
 
 
@@ -894,7 +904,7 @@ if __name__ == "__main__":
     
     app.run( 
         host="0.0.0.0",
-        port=5000,
+        port=5002,
         ssl_context=("server.pem", "server-key.pem"))
     # app.run(host="0.0.0.0", port=5000, debug=True)
 

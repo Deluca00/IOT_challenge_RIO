@@ -33,7 +33,7 @@ def list_trays():
     """Hiển thị tất cả khay"""
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM trays")
+    c.execute("SELECT * FROM medicines ")
     rows = c.fetchall()
     conn.close()
     return rows
