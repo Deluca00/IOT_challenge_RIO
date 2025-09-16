@@ -264,7 +264,7 @@ threading.Thread(target=uart_listener, daemon=True).start()
 
 def send_uart_signal_to_com5(signal, coords=None):
     try:
-        ser_com5 = serial.Serial('COM11', 115200, timeout=1)
+        ser_com5 = serial.Serial('COM5', 115200, timeout=1)
         if signal == "mode import" and coords:
             msg = f"mode import x={coords[0]}, y={coords[1]}, z={coords[2]}\n"
         elif signal == "mode hong":
@@ -347,7 +347,7 @@ def gen_barcode_frames(cam_index: int):
 
                         conn = get_connection()
                         c = conn.cursor()
-                        c.execute("SELECT tray_id FROM medicines WHERE code = ?", (data,))
+                        c.execute("SELECT tray_id2 FROM medicines WHERE code = ?", (data,))
                         row = c.fetchone()
                         if row:
                             tray_id = row[0]
@@ -364,8 +364,20 @@ def gen_barcode_frames(cam_index: int):
 
                         if uart_data == "binhthuong":
                             send_uart_signal_to_com5("mode import", (cx, cy, cz))
+                            # Reset trạng thái để cho phép quét lại barcode này
+                            confirmed.discard(data)
+                            count_buffer.pop(data, None)
+                            frame_seen_count.pop(data, None)
+                            last_seen_frame.pop(data, None)
+                            start_time.pop(data, None)
                         elif uart_data == "hong":
                             send_uart_signal_to_com5("mode hong")
+                            # Reset trạng thái để cho phép quét lại barcode này
+                            confirmed.discard(data)
+                            count_buffer.pop(data, None)
+                            frame_seen_count.pop(data, None)
+                            last_seen_frame.pop(data, None)
+                            start_time.pop(data, None)
                         # Các giá trị khác sẽ không gửi gì
 
                         color = (0, 255, 0)      # xanh lá
@@ -456,8 +468,8 @@ def save_medicine():
     else:
         # thêm thuốc mới
         c.execute("""
-            INSERT INTO medicines (name, type, code, quantity,price,strip,pill, manu_date, exp_date, tray_id)
-            VALUES (?, ?, ?, ?, ?, ?,?,?,?,?)
+            INSERT INTO medicines (name, type, code, quantity,price,strip,pill, manu_date, exp_date, tray_id,tray_id2)
+            VALUES (?, ?, ?, ?, ?, ?,?,?,?,?,?)
         """, (
             data.get("name"),
             data.get("type"),
@@ -469,6 +481,7 @@ def save_medicine():
             data.get("manuDate"),
             data.get("expDate"),
             data.get("trayid"),
+            data.get("trayid2"),
         ))
         conn.commit()
         new_id = c.lastrowid
@@ -804,9 +817,104 @@ def sell():
         download_name="hoadon.pdf"   # tên file khi tải về
     )
 
+@app.route("/td_page")
+def td_page():
+    if "uid" not in session:  # bắt buộc login
+        return redirect(url_for("root"))
+    return render_template("td_page.html")
 
 
 
+
+@app.get("/api/trays")
+def list_trays():
+    try:
+        with get_connection() as conn:
+            cur = conn.execute("SELECT id, name, x, y, z FROM trays ORDER BY id ASC")
+            rows = [dict(r) for r in cur.fetchall()]
+        return {"success": True, "data": rows}, 200
+    except Exception as e:
+        return {
+            "success": False,
+            "error": "Không lấy được danh sách trays",
+            "detail": str(e)
+        }, 500
+
+
+
+@app.route("/api/trays", methods=["POST"])
+def create_tray():
+    try:
+        data = request.get_json(force=True) or {}
+        name = (data.get("name") or "").strip()
+        x, y, z = data.get("x"), data.get("y"), data.get("z")
+
+        if not name:
+            return {"success": False, "error": "Thiếu 'name'"}, 400
+        try:
+            x = float(x); y = float(y); z = float(z)
+        except Exception:
+            return {"success": False, "error": "'x','y','z' phải là số"}, 400
+
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("INSERT INTO trays (name, x, y, z) VALUES (?,?,?,?)", (name, x, y, z))
+        tray_id = c.lastrowid
+        conn.commit()
+        row = conn.execute("SELECT id, name, x, y, z FROM trays WHERE id=?", (tray_id,)).fetchone()
+        conn.close()
+        return {"success": True, "message": "Tạo tray thành công", "data": dict(row)}, 201
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 500
+
+
+@app.route("/api/trays/<int:tray_id>", methods=["PUT"])
+def update_tray(tray_id):
+    try:
+        data = request.get_json(force=True) or {}
+        print("DEBUG JSON:", data)
+
+        name = (data.get("name") or "").strip()
+        x, y, z = data.get("x"), data.get("y"), data.get("z")
+        try:
+            x = float(x); y = float(y); z = float(z)
+        except Exception:
+            return {"success": False, "error": "'x','y','z' phải là số"}, 400
+
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute(
+            "UPDATE trays SET name=?, x=?, y=?, z=? WHERE id=?",
+            (name, x, y, z, tray_id)
+        )
+        conn.commit()
+        print("DEBUG rowcount:", c.rowcount)
+        if c.rowcount == 0:
+            conn.close()
+            return {"success": False, "error": "Không tìm thấy tray"}, 404
+        row = conn.execute("SELECT id, name, x, y, z FROM trays WHERE id=?", (tray_id,)).fetchone()
+        conn.close()
+        return {"success": True, "message": "Cập nhật tray thành công", "data": dict(row)}
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return {"success": False, "error": str(e)}, 500
+
+
+@app.route("/api/trays/<int:tray_id>", methods=["DELETE"])
+def delete_tray(tray_id):
+    try:
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("DELETE FROM trays WHERE id=?", (tray_id,))
+        conn.commit()
+        if c.rowcount == 0:
+            conn.close()
+            return {"success": False, "error": "Không tìm thấy tray"}, 404
+        conn.close()
+        return {"success": True, "message": "Xóa tray thành công"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 500
 
 
 @app.route("/me")

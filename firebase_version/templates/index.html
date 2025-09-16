@@ -308,7 +308,7 @@
       <form id="form" method="POST" action="/scan_barcode">
         <input type="hidden" name="image" id="imageInput">
       </form>
-      <button id="scanBarcodeBtn" class="text-[#1e88e5] text-xl sm:text-2xl">
+      <button id="tdBtn" class="text-[#1e88e5] text-xl sm:text-2xl">
         <i class="fas fa-users"></i>
       </button>
       <button class="text-gray-700 text-xl sm:text-2xl">
@@ -372,7 +372,7 @@
 
     const btnNhapThuoc = document.getElementById("btnNhapThuoc");
     const btnbanthuoc = document.getElementById("btnBanthuoc");
-    const btnScanBarcode = document.getElementById("scanBarcodeBtn");
+    const btntd = document.getElementById("tdBtn");
     const cameraDiv = document.getElementById("cameraDiv");
     const video = document.getElementById("video");
     const btnCapture = document.getElementById("btnCapture");
@@ -447,8 +447,8 @@
 
     btnClose.addEventListener("click", stopCamera);
 
-    btnScanBarcode.addEventListener("click", () => {
-      window.location.href = "/barcode_page";
+    btntd.addEventListener("click", () => {
+      window.location.href = "/td_page";
     });
   </script>
 </body>
