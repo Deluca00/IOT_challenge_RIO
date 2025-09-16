@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quản Lý Trays</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50: '#e0f2fe', 500: '#0284c7', 600: '#0369a1', 700: '#075985' },
+            accent: { 500: '#10b981', 600: '#059669' }
+          },
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          animation: { 'fade-in': 'fadeIn .3s ease', 'slide-up': 'slideUp .3s ease' },
+          keyframes: {
+            fadeIn: { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
+            slideUp: { '0%': { transform: 'translateY(10px)', opacity: 0 }, '100%': { transform: 'translateY(0)', opacity: 1 } }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100 min-h-screen font-sans">
+
+  <div x-data="trayManager()" x-init="init()" class="container mx-auto px-4 py-10">
+    <!-- Header -->
+    <div class="mb-8">
+      <div class="flex items-center justify-between gap-4">
+        <h1 class="text-4xl font-bold text-gray-900 dark:text-white">Quản Lý Trays</h1>
+        <a href="/" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0h6"/>
+          </svg>
+          Trang chủ
+        </a>
+      </div>
+      <p class="mt-3 text-lg text-gray-600 dark:text-gray-400">
+        Quản lý thông tin trays với giao diện đẹp, hiện đại và dễ sử dụng.
+      </p>
+    </div>
+
+    <!-- Search / Sort / Add -->
+    <div class="flex flex-col sm:flex-row gap-4 mb-8">
+      <input type="text" x-model.debounce.300ms="searchTerm" placeholder="Tìm kiếm theo Name hoặc ID..."
+             class="flex-1 px-5 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all shadow-sm">
+      <select x-model="sortBy" @change="sortTrays"
+              class="px-5 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm">
+        <option value="id">Sắp xếp theo ID</option>
+        <option value="name">Sắp xếp theo Name</option>
+        <option value="x">Sắp xếp theo X</option>
+        <option value="y">Sắp xếp theo Y</option>
+        <option value="z">Sắp xếp theo Z</option>
+      </select>
+      <button @click="openAddModal()" class="px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-all shadow-md hover:shadow-lg font-medium">
+        Thêm Tray
+      </button>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white dark:bg-gray-800 shadow-xl rounded-xl overflow-hidden">
+      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead class="bg-gray-50 dark:bg-gray-700">
+          <tr>
+            <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase">ID</th>
+            <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase">Name</th>
+            <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase">X</th>
+            <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase">Y</th>
+            <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase">Z</th>
+            <th class="px-6 py-4 text-left text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase">Hành Động</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+          <template x-for="tray in filteredTrays" :key="tray.id">
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200">
+              <td class="px-6 py-4 text-sm font-medium" x-text="tray.id"></td>
+              <td class="px-6 py-4 text-sm" x-text="tray.name"></td>
+              <td class="px-6 py-4 text-sm" x-text="formatNumber(tray.x)"></td>
+              <td class="px-6 py-4 text-sm" x-text="formatNumber(tray.y)"></td>
+              <td class="px-6 py-4 text-sm" x-text="formatNumber(tray.z)"></td>
+              <td class="px-6 py-4 text-sm font-medium space-x-3">
+                <button @click="editTray(tray)" class="text-primary-500 hover:text-primary-700">Sửa</button>
+                <button @click="deleteTray(tray.id)" class="text-red-500 hover:text-red-700">Xóa</button>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="filteredTrays.length === 0">
+            <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400 text-lg">Không tìm thấy trays nào.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Modal Thêm/Sửa -->
+    <div x-show="showAddModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" x-transition>
+      <div class="bg-white dark:bg-gray-800 rounded-2xl p-8 w-full max-w-lg mx-4 shadow-2xl" x-transition>
+        <h2 class="text-2xl font-bold mb-6" x-text="editingTray ? 'Sửa Tray' : 'Thêm Tray Mới'"></h2>
+        <form @submit.prevent="saveTray">
+          <div class="mb-5">
+            <label class="block text-sm font-medium mb-2">ID (Tự động nếu thêm mới)</label>
+            <input type="number" x-model="currentTray.id" disabled class="w-full px-4 py-3 border rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500">
+          </div>
+          <div class="mb-5">
+            <label class="block text-sm font-medium mb-2">Name</label>
+            <input type="text" x-model.trim="currentTray.name" required
+                   :class="{'border-red-500': !currentTray.name && formSubmitted}"
+                   class="w-full px-4 py-3 border rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <p x-show="!currentTray.name && formSubmitted" class="text-red-500 text-sm mt-1">Vui lòng nhập tên tray.</p>
+          </div>
+          <div class="grid grid-cols-3 gap-4 mb-6">
+            <template x-for="axis in ['x','y','z']" :key="axis">
+              <div>
+                <label class="block text-sm font-medium mb-2" x-text="axis.toUpperCase()"></label>
+                <input type="number" step="0.01" x-model="currentTray[axis]"
+                       :class="{'border-red-500': (!currentTray[axis] && formSubmitted)}"
+                       class="w-full px-4 py-3 border rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500">
+              </div>
+            </template>
+          </div>
+          <div class="flex justify-end gap-3">
+            <button type="button" @click="closeModal()" class="px-5 py-3 text-gray-600 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">Hủy</button>
+            <button type="submit" class="px-5 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 shadow-md">Lưu</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div x-show="showToast" class="fixed bottom-4 right-4 bg-accent-500 text-white px-6 py-3 rounded-lg shadow-lg" x-transition>
+      <span x-text="toastMessage"></span>
+    </div>
+  </div>
+
+  <script>
+    function trayManager() {
+      const API_BASE = '/api/trays';
+
+      return {
+        trays: [],
+        searchTerm: '',
+        sortBy: 'id',
+        showAddModal: false,
+        showToast: false,
+        toastMessage: '',
+        formSubmitted: false,
+        editingTray: false,
+        currentTray: { id: null, name: '', x: '', y: '', z: '' },
+
+        async init() {
+          await this.fetchTrays();
+        },
+
+        get filteredTrays() {
+          let data = [...this.trays];
+          const q = this.searchTerm.trim().toLowerCase();
+          if (q) {
+            data = data.filter(t =>
+              String(t.id).includes(q) ||
+              (t.name || '').toLowerCase().includes(q)
+            );
+          }
+          data.sort((a, b) => {
+            const key = this.sortBy;
+            if (key === 'name') return (a.name || '').localeCompare(b.name || '', 'vi');
+            return Number(a[key]) - Number(b[key]);
+          });
+          return data;
+        },
+
+        formatNumber(v) { const n = Number(v); return Number.isFinite(n) ? n.toFixed(2) : '-'; },
+        showToastMessage(msg) { this.toastMessage = msg; this.showToast = true; setTimeout(() => (this.showToast = false), 1800); },
+
+        openAddModal() {
+          this.editingTray = false;
+          this.formSubmitted = false;
+          this.currentTray = { id: null, name: '', x: '', y: '', z: '' };
+          this.showAddModal = true;
+        },
+        closeModal() { this.showAddModal = false; this.formSubmitted = false; },
+        sortTrays() { this.trays = [...this.trays]; },
+
+        editTray(tray) {
+          this.editingTray = true;
+          this.formSubmitted = false;
+          this.currentTray = { ...tray };
+          this.showAddModal = true;
+        },
+
+        normalizedPayload() {
+          const toNum = (v) => { const n = Number(v); if (!Number.isFinite(n)) throw new Error('Giá trị không hợp lệ'); return n; };
+          return { name: (this.currentTray.name || '').trim(), x: toNum(this.currentTray.x), y: toNum(this.currentTray.y), z: toNum(this.currentTray.z) };
+        },
+
+        async fetchTrays() {
+          try {
+            const res = await fetch(API_BASE);
+            const json = await res.json();
+            if (json.success) this.trays = json.data;
+            else this.showToastMessage(json.error || 'Lỗi tải dữ liệu');
+          } catch (e) { console.error(e); this.showToastMessage('Lỗi kết nối'); }
+        },
+
+        async addTray() {
+          try {
+            const payload = this.normalizedPayload();
+            const res = await fetch(API_BASE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const json = await res.json();
+            if (!json.success) return this.showToastMessage(json.error || 'Thêm thất bại');
+            this.showToastMessage(json.message || 'Thêm thành công');
+            await this.fetchTrays();
+          } catch (e) { console.error(e); this.showToastMessage('Lỗi thêm tray'); }
+        },
+
+        async saveTray() {
+          this.formSubmitted = true;
+          if (!this.currentTray.name) return;
+          try {
+            const payload = this.normalizedPayload();
+            if (this.editingTray) {
+              const res = await fetch(`${API_BASE}/${this.currentTray.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+              const json = await res.json();
+              if (!json.success) return this.showToastMessage(json.error || 'Sửa thất bại');
+              this.showToastMessage(json.message || 'Sửa thành công');
+            } else {
+              await this.addTray();
+            }
+            await this.fetchTrays();
+            this.closeModal();
+          } catch (e) { console.error(e); this.showToastMessage('Dữ liệu không hợp lệ'); }
+        },
+
+        async deleteTray(id) {
+          if (!confirm('Bạn có chắc muốn xóa tray này?')) return;
+          try {
+            const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' });
+            const json = await res.json();
+            if (!json.success) return this.showToastMessage(json.error || 'Xóa thất bại');
+            this.showToastMessage(json.message || 'Xóa thành công');
+            await this.fetchTrays();
+          } catch (e) { console.error(e); this.showToastMessage('Lỗi xóa tray'); }
+        }
+      };
+    }
+  </script>
+</body>
+</html>

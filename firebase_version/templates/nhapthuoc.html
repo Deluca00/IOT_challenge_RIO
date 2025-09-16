@@ -72,6 +72,14 @@
                     </select>
                 </div>
 
+                <div>
+                    <label for="medicineLocation2" class="block text-sm font-medium text-gray-700">Tọa độ Thuốc ra</label>
+                    <select id="medicineLocation2" name="medicineLocation2" required
+                        class="mt-1 block w-full rounded-md border border-gray-300 p-2 focus:outline-none focus:ring focus:ring-blue-200">
+                        <option value="">Đang tải...</option>
+                    </select>
+                </div>
+
 
                 <div>
                     <label for="manufacturingDate" class="block text-sm font-medium text-gray-700">Ngày Sản Xuất</label>
@@ -249,6 +257,7 @@
                 strips: document.getElementById('stripsPerBox').value,
                 pills: document.getElementById('pillsPerStrip').value,
                 trayid: document.getElementById('medicineLocation').value,
+                trayid2: document.getElementById('medicineLocation2').value,
                 manuDate: document.getElementById('manufacturingDate').value,
                 expDate: document.getElementById('expirationDate').value
             };
@@ -320,12 +329,16 @@
         async function loadTrays() {
             const res = await fetch('/get_trays');
             const data = await res.json();
-            const trays = data.trays || [];   // lấy mảng trays
+            const trays = data.trays || [];
 
             const selectAdd = document.getElementById('medicineLocation');
+            const selectAdd2 = document.getElementById('medicineLocation2');
             const selectEdit = document.getElementById('editLocation');
 
             selectAdd.innerHTML = '<option value="">Chọn tọa độ</option>';
+            if (selectAdd2) {
+                selectAdd2.innerHTML = '<option value="">Chọn tọa độ</option>';
+            }
             if (selectEdit) {
                 selectEdit.innerHTML = '<option value="">Chọn tọa độ</option>';
             }
@@ -338,11 +351,17 @@
                 opt1.textContent = text;
                 selectAdd.appendChild(opt1);
 
-                if (selectEdit) {
+                if (selectAdd2) {
                     const opt2 = document.createElement('option');
                     opt2.value = tray.id;
                     opt2.textContent = text;
-                    selectEdit.appendChild(opt2);
+                    selectAdd2.appendChild(opt2);
+                }
+                if (selectEdit) {
+                    const opt3 = document.createElement('option');
+                    opt3.value = tray.id;
+                    opt3.textContent = text;
+                    selectEdit.appendChild(opt3);
                 }
             });
         }

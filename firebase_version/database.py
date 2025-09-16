@@ -7,6 +7,9 @@ def get_connection():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row  # Trả về dict-like thay vì tuple
     return conn
+def column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
+    cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table});")}
+    return column in cols
 
 def init_db():
     """Tạo bảng nếu chưa có"""
@@ -40,11 +43,14 @@ def init_db():
     manu_date TEXT,
     exp_date TEXT,
     tray_id INTEGER,
+    tray_id2 INTEGER,  -- khay phụ (nếu có)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tray_id) REFERENCES trays(id)
 )
-
+    
     """)
+    if not column_exists(conn, "medicines", "tray_id2"):
+        conn.execute("ALTER TABLE medicines ADD COLUMN tray_id2 INTEGER;")
     c.execute("""
     CREATE TABLE IF NOT EXISTS sales (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
