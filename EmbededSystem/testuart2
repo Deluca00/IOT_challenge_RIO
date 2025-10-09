@@ -1,0 +1,21 @@
+import serial
+
+# Mở cổng USB–UART (check bằng: ls /dev/ttyUSB*)
+ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)
+
+print("📡 Đang lắng nghe dữ liệu UART từ Arduino... (Ctrl+C để thoát)")
+
+try:
+    while True:
+        # Đọc 1 dòng dữ liệu (kết thúc bằng \n)
+        line = ser.readline().decode(errors="ignore").strip()
+        if line:
+            print(f"[RX] {line}")
+
+            # Nếu muốn gửi lại phản hồi về Arduino
+            ser.write((f"Đã nhận: {line}\n").encode())
+
+except KeyboardInterrupt:
+    print("\n⏹ Dừng lại.")
+finally:
+    ser.close()

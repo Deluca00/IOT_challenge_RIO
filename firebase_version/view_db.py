@@ -4,7 +4,7 @@
 
 import sqlite3
 
-DB_NAME = "database.db"
+DB_NAME = "./database.db"
 
 def get_conn():
     conn = sqlite3.connect(DB_NAME)
@@ -55,24 +55,6 @@ def update_medicine(med_id: int, **fields) -> int:
 
     Trả về: số dòng được cập nhật (0 hoặc 1). Ném lỗi nếu không có cột hợp lệ.
     """
-<<<<<<< HEAD
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("DELETE FROM trays WHERE id BETWEEN ? AND ?", (start_id, end_id))
-    conn.commit()
-    deleted_count = c.rowcount
-    conn.close()
-    return deleted_count
-
-def list_trays():
-    """Hiển thị tất cả khay"""
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM medicines ")
-    rows = c.fetchall()
-    conn.close()
-    return rows
-=======
     allowed = {
         "name", "type", "code", "quantity", "price", "strip", "pill",
         "left_strip", "left_pill", "manu_date", "exp_date", "tray_id", "tray_id2"
@@ -117,7 +99,6 @@ def preview(limit: int = 10):
         print(f"{str(r['id']).ljust(2)} | {str(r['name'] or '')[:20].ljust(20)} | "
               f"{str(r['tray_id']).ljust(7)} | {str(r['tray_id2']).ljust(7)} | "
               f"{str(r['price']).ljust(7)} | {str(r['left_strip']).ljust(10)} | {str(r['left_pill']).ljust(8)}")
->>>>>>> 3e8ca1baa09b3c8eb7d2c70de88a44b503b0f542
 
 if __name__ == "__main__":
     # Bước 1: đảm bảo có tray_id2 và backfill

@@ -16,6 +16,7 @@ from collections import defaultdict
 import warnings
 import os
 import serial
+from collections import deque
 
 
 app = Flask(__name__)
@@ -29,8 +30,8 @@ init_db()
 # - Ví dụ thay bằng rtsp/HTTP: "rtsp://user:pass@192.168.1.10/stream1"
 ###############################################################################
 CAMERA_SOURCES = [
-    {"type": "usb", "index": 0},   # /dev/video0
-    {"type": "usb", "index": 2},   # /dev/video1
+    {"type": "usb", "index": 2},   # /dev/video0
+    {"type": "usb", "index": 0},   # /dev/video1
     # {"type": "usb", "index": 6}  # Pi Camera
 ]
 
@@ -63,6 +64,7 @@ class CameraStream:
         self.cap = cv2.VideoCapture(self.src)
         if not self.cap.isOpened():
             print(f"❌ Không mở được camera: {self.src}")
+
     def start(self):
         if self.running:
             return
@@ -249,60 +251,106 @@ REQUIRED_FRAMES = 3      # hoặc 3 frame liên tiếp
 warnings.filterwarnings("ignore", category=UserWarning, message=".*zbar.*")
 
 # Tiến hành các bước giải mã mã vạch như bình thường
- 
 
-uart_data = None  # Biến toàn cục lưu dữ liệu UART
 
-ser_usb0 = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
-# ser_acm0 = serial.Serial('/dev/ttyACM1', 115200, timeout=1)
 
-def uart_listener():
+# Thread lắng nghe UART từ vi điều khiển khác (ví dụ COM4)
+uart_data = None
+uart_data_check = None
+uart_lock = threading.Lock()
+last_uart_value = None   # để so sánh với lần trước
+
+def uart_listener(port='/dev/ttyUSB0',baud=9600):
     global uart_data
-    uart_in = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)  # Đổi COM4 thành cổng bạn dùng
-    while True:
-        if uart_in.in_waiting:
-            data = uart_in.readline().decode().strip()
-            print(f"[UART IN] Nhận: {data}")
-            uart_data = data  # Lưu giá trị nhận được
+    ser = serial.Serial(port, baud, timeout=1)
+    try:
+        while True:
+            line = ser.readline()
+            if not line:
+                continue
+            data = line.decode(errors='ignore').strip()
+            if data:
+                print(f"[UART IN] {data}")
+                with uart_lock:
+                    uart_data = data
+    finally:
+        ser.close() 
 
-threading.Thread(target=uart_listener, daemon=True).start()
+uart_check_q = deque()     # queue chứa các dòng uart_check
+uart_lock = threading.Lock()
 
-# def send_uart_signal(signal, coords):
-#     global ser_acm0
-#     signal = signal.lower()
-
-#     if signal == "mode import" and coords:
-#         ser_acm0.write(b"MODE IMPORT\r\n")
-#         msg = f"X{coords[0]}Y{coords[1]}Z{coords[2]}\r\n"
-#         ser_acm0.write(msg.encode())
-#         print(f"[UART OUT] MODE IMPORT + {msg.strip()}")
-
-#     elif signal == "mode hong":
-#         ser_acm0.write(b"MODE HONG\r\n")
-#         print("[UART OUT] MODE HONG")
-
-#     elif signal == "mode export" and coords:
-#         ser_acm0.write(b"MODE EXPORT\r\n")
-#         msg = f"X{coords[0]}Y{coords[1]}Z{coords[2]}\r\n"
-#         ser_acm0.write(msg.encode())
-#         print(f"[UART OUT] MODE EXPORT + {msg.strip()}")
-#     else:
-#         msg = f"{signal}\r\n"
-#         ser_acm0.write(msg.encode())
-#         print(f"[UART OUT] {msg.strip()}") 
-
+def uart_listener_check(port='/dev/ttyACM0', baud=115200):
+    ser = serial.Serial(port, baud, timeout=1)
+    try:
+        while True:
+            line = ser.readline()
+            if not line:
+                continue
+            data = line.decode(errors='ignore').strip()
+            if data:
+                print(f"[UART IN] {data}")
+                with uart_lock:
+                    uart_check_q.append(data)   # append vào queue
+    finally:
+        ser.close() 
 
 
+def consume_latest_uart_check():
+    """Lấy ra 1 dòng UART check (FIFO). Trả về None nếu rỗng"""
+    global uart_check_q
+    with uart_lock:
+        if uart_check_q:
+            return uart_check_q.popleft()
+        else:
+            return None
+        
+
+def consume_latest_uart():
+    global uart_data
+    with uart_lock:
+        val = uart_data
+        uart_data = None
+        return val
     
-# ==== API ====
-@app.route("/send", methods=["POST"])
-def send():
-    data = request.json           # Lấy JSON body từ request
-    signal = data.get("signal")   # Ví dụ: "mode import"
-    coords = data.get("coords")   # Ví dụ: [30, 0, 0]
-    send_uart_signal(signal, coords)  # Gửi ra UART
-    return jsonify({"status": "sent", "signal": signal})
-  
+
+
+# Khởi động thread UART listener khi chạy app
+import threading
+threading.Thread(target=uart_listener, daemon=True).start()
+# Sau dòng: threading.Thread(target=uart_listener, daemon=True).start()
+threading.Thread(target=uart_listener_check, daemon=True).start()
+
+
+
+ser_acm0 = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
+def send_uart_signal(signal, coords):
+    global ser_acm0
+    signal = signal.lower()
+
+    if signal == "mode import" and coords:
+        ser_acm0.write(b"MODE IMPORT\r\n")
+        ser_acm0.write(b"Y42\r\n")
+        msg = f"X{coords[0]}Y{coords[1]}Z{coords[2]}\r\n"
+        ser_acm0.write(msg.encode())
+        print(f"[UART OUT] MODE IMPORT + {msg.strip()}")
+
+    elif signal == "mode hong":
+        ser_acm0.write(b"MODE HONG\r\n")
+        print("[UART OUT] MODE HONG")
+
+    elif signal == "mode export" and coords:
+        ser_acm0.write(b"MODE EXPORT\r\n")
+        msg = f"X{coords[0]}Y{coords[1]}Z{coords[2]}\r\n"
+        ser_acm0.write(msg.encode())
+        print(f"[UART OUT] MODE EXPORT + {msg.strip()}")
+    else:
+        msg = f"{signal}\r\n"
+        ser_acm0.write(msg.encode())
+        print(f"[UART OUT] {msg.strip()}")
+
+
+paused_decode = False
+pending_q = deque()
 def gen_barcode_frames(cam_index: int):
     if cam_index < 0 or cam_index >= len(streams):
         return
@@ -310,38 +358,125 @@ def gen_barcode_frames(cam_index: int):
     stream = streams[cam_index]
     stream.start()
 
-
-    # Trạng thái cho stream này (mỗi camera độc lập)
-    detected_barcodes = set()
+    # --- Trạng thái cho stream này (mỗi camera độc lập) ---
     count_buffer      = defaultdict(int)
     start_time        = defaultdict(float)
     confirmed         = set()
     frame_seen_count  = defaultdict(int)
     last_seen_frame   = defaultdict(int)
-    frame_idx = 0
+    frame_idx         = 0
+
+    # --- Gating logic ---
+                     # dừng/cho phép decode (chỉ ảnh hưởng decode)
+    uart_ready = False             # one-shot: cho phép xử lý 1 barcode trong pending_q
+    last_uart_value = None         # giá trị gần nhất từ UART chính
+    last_check_value = None        # giá trị gần nhất từ UART CHECK
+                # item: {"code","cx","cy","cz"}
 
     try:
         while True:
-            ok, frame = stream.cap.read()   # ✅ sửa từ cap -> stream.cap
+            ok, frame = stream.cap.read()
             if not ok:
                 break
             frame_idx += 1
+            
+            global paused_decode,pending_q
 
-            # Tạo các phiên bản ảnh
+            # 1) UART chính
+            value = consume_latest_uart()
+            # print(f"[UART] value={value}, last_uart_value={last_uart_value}")
+            if value is not None and value != last_uart_value:
+                v = value.strip().lower()
+                if v == "binhthuong":
+                    paused_decode = True
+                    uart_ready = True
+                    # pending_q không bị clear
+                    print(f"[UART] 'binhthuong' → decode OFF, uart_ready={uart_ready}, pending_q={len(pending_q)}")
+                    conn = get_connection()
+                    c = conn.cursor()
+                    for item in pending_q:
+                        code = item["code"]
+                        # đọc quantity hiện tại
+                        c.execute("SELECT quantity FROM medicines WHERE code = ?", (code,))
+                        row = c.fetchone()
+                        if row:
+                            try:
+                                current_qty = int(row[0])
+                            except ValueError:
+                                current_qty = 0
+                            new_qty = str(current_qty + 1)
+                            c.execute("UPDATE medicines SET quantity = ? WHERE code = ?", (new_qty, code))
+                    conn.commit()
+                    conn.close()
+                elif v == "hong":
+                    print("[UART] 'hong' → MODE HONG & TẮT decode")
+                    send_uart_signal("mode hong", None)
+                    pending_q.clear()
+                    paused_decode = True
+                    uart_ready = False
+                    confirmed.discard(code)
+                    count_buffer.pop(code, None)
+                    frame_seen_count.pop(code, None)
+                    last_seen_frame.pop(code, None)
+                    start_time.pop(code, None)
+                    last_uart_value = None
+                last_uart_value = v
+
+            # 2) UART-CHECK chỉ bật/tắt decode thôi
+            while True:
+                value_ck = consume_latest_uart_check()
+                if value_ck is None:
+                    break   # hết dữ liệu thì thoát loop nhỏ
+
+                print(f"[UART-CHECK] value_ck={value_ck}, last_check_value={last_check_value}")
+                vck = value_ck.strip().lower()
+
+                if vck == "ok":
+                    paused_decode = False
+                    print(f"[UART-CHECK] nhận được: {vck}, paused_decode={paused_decode}")
+
+                last_check_value = vck
+
+            # 3) Pending luôn được xử lý nếu uart_ready=True
+            if uart_ready and pending_q:
+                item = pending_q.popleft()
+                cx, cy, cz = item["cx"], item["cy"], item["cz"]
+                code = item["code"]
+                print(f"[CAM {cam_index}] ▶ XỬ LÝ: {code} ({cx},{cy},{cz})")
+                send_uart_signal("mode import", (cx, cy, cz))
+
+                # reset state
+                confirmed.discard(code)
+                count_buffer.pop(code, None)
+                frame_seen_count.pop(code, None)
+                last_seen_frame.pop(code, None)
+                start_time.pop(code, None)
+                
+                last_uart_value = None
+                uart_ready = False    # one-shot xong thì tắt quyền
+
+            # 4) Nếu đang pause decode → không decode, nhưng vẫn render frame
+            if paused_decode:
+                cv2.putText(frame, f"[CAM {cam_index}] DECODE OFF",
+                            (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                ok, buf = cv2.imencode(".jpg", frame)
+                if ok:
+                    yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + buf.tobytes() + b"\r\n")
+                time.sleep(0.02)
+                continue
+            # 5) KHÔNG paused → Decode barcode
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             gray_eq = cv2.equalizeHist(gray)
             _, thresh = cv2.threshold(
                 gray_eq, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
             )
-
-            # Thử decode trên nhiều phiên bản
             versions = [("thresh", thresh), ("gray_eq", gray_eq), ("orig", frame)]
             seen_this_frame = set()
             results = []
             for _, img in versions:
                 results = decode(img)
                 if results:
-                    break  # ưu tiên phiên bản đầu tiên decode được
+                    break
 
             for bc in results:
                 data = bc.data.decode("utf-8", errors="ignore").strip()
@@ -349,7 +484,7 @@ def gen_barcode_frames(cam_index: int):
                     continue
                 seen_this_frame.add(data)
 
-                # --- Xử lý logic đếm ---
+                # đếm khung liên tiếp
                 if last_seen_frame[data] == frame_idx - 1:
                     frame_seen_count[data] += 1
                 else:
@@ -372,7 +507,7 @@ def gen_barcode_frames(cam_index: int):
                            (frame_seen_count[data] >= REQUIRED_FRAMES)
                     if just:
                         confirmed.add(data)
-
+                        # truy vấn toạ độ khay
                         conn = get_connection()
                         c = conn.cursor()
                         c.execute("SELECT tray_id FROM medicines WHERE code = ?", (data,))
@@ -382,34 +517,39 @@ def gen_barcode_frames(cam_index: int):
                             c.execute("SELECT x, y, z FROM trays WHERE id = ?", (tray_id,))
                             tray = c.fetchone()
                             if tray:
-                                cx, cy, cz = tray
+                                try:
+                                    cx, cy, cz = tray["x"], tray["y"], tray["z"]
+                                except Exception:
+                                    cx, cy, cz = tray[0], tray[1], tray[2]
                             else:
                                 cx = cy = cz = 0
                         else:
                             cx = cy = cz = 0
+                        conn.close()
 
-                        print(f"[CAM {cam_index}] ✅ XÁC NHẬN: {data} tại tọa độ từ SQL (x={cx}, y={cy}, z={cz})", flush=True)
+                        print(f"[CAM {cam_index}] ✅ XÁC NHẬN: {data} (x={cx}, y={cy}, z={cz})")
+                        # Đưa vào hàng đợi, sẽ xử lý khi uart_ready=True
+                        pending_q.append({"code": data, "cx": cx, "cy": cy, "cz": cz})
+                        print(f"[CAM {cam_index}] pending_q length={len(pending_q)}")
 
-                        # if uart_data == "binhthuong":
-                            # send_uart_signal("mode import", (cx, cy, cz))
-                            # print("kkkk")
-                            # print(f"uart_data: {uart_data}")
-                        # elif uart_data == "hong":
-                            # send_uart_signal("mode hong", (0, 0, 0))
-                            # print("lll")
-                            # print(f"uart_data: {uart_data}")
-                        # Các giá trị khác sẽ không gửi gì
-
-                        color = (0, 255, 0)      # xanh lá
-                        label = f"{data} ✓"
+                        color = (0, 165, 255)  # cam: đã confirm, đang pending
+                        label = f"{data} ✓ (pending)"
                     else:
-                        color = (0, 255, 255)    # vàng
+                        color = (0, 255, 255)  # vàng: đang đọc/đếm
                         label = f"{data}"
                 else:
-                    color = (0, 0, 255)          # đỏ
-                    label = f"{data} ✓"
+                    # đã confirm: hiển thị tuỳ pending/ready
+                    if any(item["code"] == data for item in pending_q):
+                        label = f"{data} ✓ (pending)"
+                        color = (0, 165, 255)
+                    elif uart_ready:
+                        label = f"{data} ✓ (ready)"
+                        color = (0, 255, 0)
+                    else:
+                        label = f"{data} ✓"
+                        color = (0, 0, 255)
 
-                # --- Vẽ bounding box ---
+                # vẽ khung
                 if bc.polygon and len(bc.polygon) >= 4:
                     pts = [(int(p.x), int(p.y)) for p in bc.polygon]
                     for i in range(len(pts)):
@@ -419,22 +559,23 @@ def gen_barcode_frames(cam_index: int):
                     x, y, w, h = bc.rect
                     cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
                     tx, ty = x, y - 10
-                safe_label = label.encode('ascii', errors='ignore').decode('ascii')
 
+                safe_label = label.encode('ascii', errors='ignore').decode('ascii')
                 cv2.putText(frame, f"[CAM {cam_index}] {safe_label}",
                             (tx, max(20, ty - 10)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
 
-            # Encode JPEG để stream
+            # 6) Stream MJPEG
             ok, buf = cv2.imencode(".jpg", frame)
             if not ok:
                 continue
-            jpg = buf.tobytes()
-            yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" +
-                   jpg + b"\r\n")
-    finally:
-        stream.cap.release()
+            yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + buf.tobytes() + b"\r\n")
 
+    finally:
+        try:
+            stream.cap.release()
+        except Exception:
+            pass
 
 @app.route('/')
 def barcode_page():
@@ -462,6 +603,31 @@ def get_medicine(code):
         return {"exists": True, "medicine": dict(row)}
     return {"exists": False}
 
+@app.route("/get_medicine_id/<int:med_id>", methods=["GET"])
+def get_medicine_by_id(med_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM medicines WHERE id=?", (med_id,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return jsonify({"success": True, "medicine": dict(row)})
+    return jsonify({"success": False, "error": "Không tìm thấy thuốc"})
+
+# API: Tìm kiếm thuốc theo tên
+@app.route("/search_medicine", methods=["GET"])
+def search_medicine():
+    name = request.args.get("name", "").strip()
+    if not name:
+        return jsonify({"success": False, "error": "Thiếu tên thuốc"})
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM medicines WHERE name LIKE ?", (f"%{name}%",))
+    rows = c.fetchall()
+    conn.close()
+    medicines = [dict(row) for row in rows]
+    return jsonify({"success": True, "medicines": medicines})
+
 
 @app.route("/save_medicine", methods=["POST"])
 def save_medicine():
@@ -488,8 +654,8 @@ def save_medicine():
     else:
         # thêm thuốc mới
         c.execute("""
-            INSERT INTO medicines (name, type, code, quantity,price,strip,pill, manu_date, exp_date, tray_id)
-            VALUES (?, ?, ?, ?, ?, ?,?,?,?,?)
+            INSERT INTO medicines (name, type, code, quantity,price,strip,pill, manu_date, exp_date, tray_id,tray_id2)
+            VALUES (?, ?, ?, ?, ?, ?,?,?,?,?,?)
         """, (
             data.get("name"),
             data.get("type"),
@@ -501,6 +667,7 @@ def save_medicine():
             data.get("manuDate"),
             data.get("expDate"),
             data.get("trayid"),
+            data.get("trayid2"),
         ))
         conn.commit()
         new_id = c.lastrowid
@@ -517,6 +684,19 @@ def list_medicine():
     conn.close()
     medicines = [dict(row) for row in rows]
     return {"success": True, "data": medicines}
+
+@app.route("/list_medicine_thuoc", methods=["GET"])
+def list_medicine_thuoc():
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM medicines ORDER BY name")
+    rows = c.fetchall()
+    
+    conn.close()
+    medicines = [dict(row) for row in rows]
+    return jsonify({"success": True, "medicines": medicines})
+
+
 
 
 @app.route("/delete_medicine/<int:med_id>", methods=["DELETE"])
@@ -564,7 +744,7 @@ def update_medicine(med_id):
             SET name=?, type=?, code=?,quantity=?,price=?,strip=?,pill=?, manu_date=?, exp_date=?
             WHERE id=?
             """,
-            (name, type_, code,quantity,price,strips,pills, manuDate, expDate, med_id),
+(name, type_, code,quantity,price,strips,pills, manuDate, expDate, med_id),
         )
         conn.commit()
         print("DEBUG rowcount:", c.rowcount)  # ✅ số dòng bị ảnh hưởng
@@ -760,6 +940,10 @@ def sell():
     c = conn.cursor()
     total_price_all = 0
     sold_items = []
+
+    # Tạo queue liều thuốc
+    queue = []
+
     try:
         for item in medicines:
             medicine_id = item["medicine_id"]
@@ -769,31 +953,19 @@ def sell():
             med = c.execute("SELECT * FROM medicines WHERE id=?", (medicine_id,)).fetchone()
             if med is None:
                 raise ValueError(f"Không tìm thấy thuốc id={medicine_id}")
-            
-            medid = c.execute("SELECT tray_id FROM medicines WHERE id=?", (medicine_id,)).fetchone()
-            if medid and medid["tray_id"]:
-                tray_id = med["tray_id"]
+
+            tray_id_row = c.execute("SELECT tray_id2 FROM medicines WHERE id=?", (medicine_id,)).fetchone()
+            if tray_id_row and tray_id_row["tray_id2"]:
+                tray_id = med["tray_id2"]
                 tray = c.execute("SELECT x, y, z FROM trays WHERE id=?", (tray_id,)).fetchone()
                 if tray:
-                    print(f"[LOG] Thuốc ID={medicine_id} tọa độ: x={tray['x']}, y={tray['y']}, z={tray['z']}")
-                    # send_uart_signal("mode export", (tray['x'], tray['y'], tray['z']))
-                    # print("kkkk")
-
-                    
+                    cx, cy, cz = tray["x"], tray["y"], tray["z"]
+                    for _ in range(qty):
+                        queue.append((cx, cy, cz))
                 else:
                     print(f"[LOG] Thuốc ID={medicine_id} không có tọa độ trong bảng trays.")
             else:
                 print(f"[LOG] Thuốc ID={medicine_id} không có tray_id.")
-                
-
-                next_tray = c.execute("SELECT x, y, z FROM trays WHERE id=?",(medicine_id+1,)).fetchone()
-                if next_tray:
-                    print(f"[LOG] Thuốc ID={medicine_id+1} tọa độ: x={next_tray['x']}, y={next_tray['y']}, z={next_tray['z']}")
-                    send_uart_signal("mode export", (next_tray['x'], next_tray['y'], next_tray['z']))
-                else:
-                    print(f"[LOG] Thuốc ID={medicine_id+1} không có tọa độ trong bảng trays.")
-   
-            new_quantity, new_left_strip, new_left_pill = process_sale(med, unit, qty)
 
             # Tính giá
             price_per_box = float(med["price"])
@@ -812,6 +984,7 @@ def sell():
             total_price_all += total_price
 
             # Cập nhật kho
+            new_quantity, new_left_strip, new_left_pill = process_sale(med, unit, qty)
             c.execute("""
                 UPDATE medicines 
                 SET quantity=?, left_strip=?, left_pill=? 
@@ -831,7 +1004,17 @@ def sell():
                 "total_price": total_price
             })
 
+        # Gửi tất cả liều trong queue
+        for coords in queue:
+            print(f"[EXPORT] Sending coords: {coords}")
+            send_uart_signal("mode export", coords)
+            time.sleep(30)
+
+        # Gửi DONE sau khi xong tất cả liều
+        ser_acm0.write(b"DONE\r\n")
+
         conn.commit()
+
     except Exception as e:
         conn.rollback()
         conn.close()
@@ -840,16 +1023,116 @@ def sell():
     conn.close()
     rpdf_buffer = generate_invoice_pdf(customer_name, hometown, dob, purchase_date, sold_items, total_price_all)
 
-    # Lưu file vào static/invoices
     return send_file(
         rpdf_buffer,
         mimetype="application/pdf",
         as_attachment=True,
-        attachment_filename="report.pdf"   # tên file khi tải về
+        attachment_filename="hoadon.pdf"
     )
 
 
+@app.route("/td_page")
+def td_page():
+    if "uid" not in session:  # bắt buộc login
+        return redirect(url_for("root"))
+    return render_template("td_page.html")
 
+@app.route("/api/trays",methods=["GET"])
+def list_trays():
+    try:
+        with get_connection() as conn:
+            cur = conn.execute("SELECT id, name, x, y, z FROM trays ORDER BY id ASC")
+            rows = [dict(r) for r in cur.fetchall()]
+        return {"success": True, "data": rows}, 200
+    except Exception as e:
+        return {
+            "success": False,
+            "error": "Không lấy được danh sách trays",
+            "detail": str(e)
+        }, 500
+
+
+
+@app.route("/api/trays", methods=["POST"])
+def create_tray():
+    try:
+        data = request.get_json(force=True) or {}
+        name = (data.get("name") or "").strip()
+        x, y, z = data.get("x"), data.get("y"), data.get("z")
+
+        if not name:
+            return {"success": False, "error": "Thiếu 'name'"}, 400
+        try:
+            x = float(x); y = float(y); z = float(z)
+        except Exception:
+            return {"success": False, "error": "'x','y','z' phải là số"}, 400
+
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("INSERT INTO trays (name, x, y, z) VALUES (?,?,?,?)", (name, x, y, z))
+        tray_id = c.lastrowid
+        conn.commit()
+        row = conn.execute("SELECT id, name, x, y, z FROM trays WHERE id=?", (tray_id,)).fetchone()
+        conn.close()
+        return {"success": True, "message": "Tạo tray thành công", "data": dict(row)}, 201
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 500
+
+
+@app.route("/api/trays/<int:tray_id>", methods=["PUT"])
+def update_tray(tray_id):
+    try:
+        data = request.get_json(force=True) or {}
+        print("DEBUG JSON:", data)
+
+        name = (data.get("name") or "").strip()
+        x, y, z = data.get("x"), data.get("y"), data.get("z")
+        try:
+            x = float(x); y = float(y); z = float(z)
+        except Exception:
+            return {"success": False, "error": "'x','y','z' phải là số"}, 400
+
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute(
+            "UPDATE trays SET name=?, x=?, y=?, z=? WHERE id=?",
+            (name, x, y, z, tray_id)
+        )
+        conn.commit()
+        print("DEBUG rowcount:", c.rowcount)
+        if c.rowcount == 0:
+            conn.close()
+            return {"success": False, "error": "Không tìm thấy tray"}, 404
+        row = conn.execute("SELECT id, name, x, y, z FROM trays WHERE id=?", (tray_id,)).fetchone()
+        conn.close()
+        return {"success": True, "message": "Cập nhật tray thành công", "data": dict(row)}
+    except Exception as e:
+        import traceback; traceback.print_exc()
+    return {"success": False, "error": str(e)}, 500
+
+
+@app.route("/api/trays/<int:tray_id>", methods=["DELETE"])
+def delete_tray(tray_id):
+    try:
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("DELETE FROM trays WHERE id=?", (tray_id,))
+        conn.commit()
+        if c.rowcount == 0:
+            conn.close()
+            return {"success": False, "error": "Không tìm thấy tray"}, 404
+        conn.close()
+        return {"success": True, "message": "Xóa tray thành công"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 500
+
+
+@app.route("/thongtinthuoc")
+def thongtinthuoc_page():
+    if "uid" not in session:  # bắt buộc login
+        return redirect(url_for("root"))
+    return render_template("thongtinthuoc.html")
 
 
 @app.route("/me")
@@ -858,6 +1141,50 @@ def me():
         return {"logged_in": False}
     return {"logged_in": True, "email": session["uid"], "role": session.get("role")}
 
+
+@app.route("/api/trays/detail/<int:tray_id>", methods=["GET"])
+def tray_detail(tray_id: int):
+    # chỉ cho phép 1 và 3 (tuỳ bạn mở rộng)
+    if tray_id not in (1, 3):
+        return {"success": False, "message": "tray_id must be 1 or 3"}, 400
+
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT name, COALESCE(SUM(CAST(quantity AS INTEGER)), 0) AS qty
+        FROM medicines
+        WHERE tray_id = ?
+        GROUP BY name
+        ORDER BY name
+    """, (tray_id,))
+    rows = c.fetchall()
+    conn.close()
+
+    # hỗ trợ cả sqlite3.Row lẫn tuple
+    items = []
+    total = 0
+    for r in rows:
+        name = r["name"] if isinstance(r, dict) else r[0]
+        qty  = r["qty"]  if isinstance(r, dict) else r[1]
+        qty = int(qty or 0)
+        total += qty
+        items.append({"name": name, "qty": qty})
+
+    return {"success": True, "tray_id": tray_id, "total": total, "items": items}
+
+
+@app.route("/toggle_decode/<int:cam_index>", methods=["POST"])
+def toggle_decode(cam_index):
+    global streams
+    if cam_index < 0 or cam_index >= len(streams):
+        return jsonify({"success": False, "error": "Camera index invalid"}), 400
+
+    # Đảo trạng thái paused_decode của camera tương ứng
+    #gen_barcode_frames.paused_decode[cam_index] = not gen_barcode_frames.paused_decode.get(cam_index, False)
+    global paused_decode
+    paused_decode = not paused_decode
+    is_paused = paused_decode
+    return jsonify({"success": True, "paused": is_paused})
 
 
 
@@ -904,7 +1231,6 @@ if __name__ == "__main__":
     
     app.run( 
         host="0.0.0.0",
-        port=5002,
+        port=5000,
         ssl_context=("server.pem", "server-key.pem"))
     # app.run(host="0.0.0.0", port=5000, debug=True)
-
